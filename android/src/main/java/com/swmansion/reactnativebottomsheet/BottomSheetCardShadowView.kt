@@ -11,6 +11,7 @@ import android.os.Build
 import android.view.View
 import com.facebook.react.uimanager.PointerEvents
 import com.facebook.react.uimanager.ReactPointerEventsView
+import com.swmansion.reactnativebottomsheet.host.spreadCornerRadius
 import kotlin.math.abs
 import kotlin.math.ceil
 import kotlin.math.floor
@@ -36,12 +37,12 @@ internal data class CardShadow(
  * Drawn the way React Native draws `boxShadow`: the shadow's shape, blurred, with the card clipped
  * out of it. Hardware-accelerated blurs on shapes need API 28, so earlier versions draw no shadow.
  */
-internal class BottomSheetCardShadowView(context: Context) :
-  View(context), ReactPointerEventsView {
+internal class BottomSheetCardShadowView(context: Context) : View(context), ReactPointerEventsView {
   // Spans the whole sheet container, gaps included, so React Native must not target it.
   override val pointerEvents: PointerEvents = PointerEvents.NONE
 
   private val cornerRadii = FloatArray(4)
+  private var tapersCornerSpread = false
   private var shadows: List<CardShadow> = emptyList()
   private var blurFilters: List<BlurMaskFilter?> = emptyList()
   private var shapeLeft = 0f
@@ -84,8 +85,9 @@ internal class BottomSheetCardShadowView(context: Context) :
     invalidate()
   }
 
-  fun setCornerRadii(radii: FloatArray) {
-    if (radii.contentEquals(cornerRadii)) return
+  fun setCornerRadii(radii: FloatArray, taperedSpread: Boolean = false) {
+    if (radii.contentEquals(cornerRadii) && tapersCornerSpread == taperedSpread) return
+    tapersCornerSpread = taperedSpread
     radii.copyInto(cornerRadii)
     updateEdgeBand()
     invalidate()
@@ -156,8 +158,8 @@ internal class BottomSheetCardShadowView(context: Context) :
     if (shapeRect.width() <= 0f || shapeRect.height() <= 0f) return false
     val limit = minOf(shapeRect.width(), shapeRect.height()) / 2f
     for (corner in 0 until 4) {
-      val base = cornerRadii[corner]
-      val radius = if (base > 0f) (base + outset).coerceIn(0f, limit) else 0f
+      val radius =
+        spreadCornerRadius(cornerRadii[corner], outset, tapersCornerSpread).coerceAtMost(limit)
       pathRadii[corner * 2] = radius
       pathRadii[corner * 2 + 1] = radius
     }

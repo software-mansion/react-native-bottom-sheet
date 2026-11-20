@@ -115,6 +115,8 @@ using namespace facebook::react;
         @"maxWidth": @(detent.maxWidth),
         @"placementBias": @(detent.placementBias),
         @"scrimOpacity": @(detent.scrimOpacity),
+        @"cornerRadius": @(detent.cornerRadius),
+        @"cornerRadiusTransitionDistance": @(detent.cornerRadiusTransitionDistance),
       }];
     }
     [_sheetView setDetents:detentsArray];

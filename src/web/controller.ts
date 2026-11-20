@@ -7,6 +7,7 @@ import {
 } from './closeRequest';
 import {
   areNumbersEqual,
+  areDetentCornerStylesEqual,
   areRawDetentsEqual,
   areResolvedDetentsEqual,
   areScrimOpacitiesEqual,
@@ -178,6 +179,7 @@ export class BottomSheetWebController {
     if (
       previous === null ||
       !areNumbersEqual(previous.cornerRadii, config.cornerRadii) ||
+      !areDetentCornerStylesEqual(previous.detents, config.detents) ||
       !areShadowsEqual(previous.shadows, config.shadows)
     ) {
       this.card.updateCardShape();

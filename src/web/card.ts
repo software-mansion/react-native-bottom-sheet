@@ -32,7 +32,9 @@ const NO_INSETS = { insetLeft: 0, insetRight: 0, insetBottom: 0 };
 export class SheetCard {
   /** The card's CSS corner radii, even while none is rounded. */
   private cardCorners = '';
-  private isCardRounded = false;
+  private hasDetentCornerRadii = false;
+  private cornerRadiiDirty = true;
+  private appliedCornerRadii = [NaN, NaN, NaN, NaN];
   private appliedContentTransform: string | null = null;
   private appliedCardHeight = NaN;
   private appliedCardLeft = NaN;
@@ -43,22 +45,20 @@ export class SheetCard {
 
   resetContentTransform() {
     this.appliedContentTransform = null;
+    this.appliedCornerRadii.fill(NaN);
   }
 
   /**
-   * Applies the card's corners and shadows. They change only with the props,
-   * so per-frame updates touch the card's height and clip alone.
+   * Applies the card's shadow style and invalidates its cached geometry.
    */
   updateCardShape() {
     const { elements, config } = this.host;
     if (elements === null || config === null) return;
     const { shadow } = elements;
-    const corners = [0, 1, 2, 3]
-      .map((corner) => `${config.cornerRadii[corner] ?? 0}px`)
-      .join(' ');
-    this.cardCorners = corners;
-    this.isCardRounded = config.cornerRadii.some((radius) => radius > 0);
-    shadow.style.borderRadius = corners;
+    this.cornerRadiiDirty = true;
+    this.hasDetentCornerRadii = config.detents.some(
+      (detent) => (detent.cornerRadius ?? -1) >= 0
+    );
     shadow.style.boxShadow = config.shadows
       .map(
         ({ offsetX, offsetY, blurRadius, spreadDistance, color }) =>
@@ -105,7 +105,9 @@ export class SheetCard {
       content.style.transform = transform;
     }
 
+    const cornersChanged = this.updateCornerRadii(position);
     if (
+      !cornersChanged &&
       cardHeight === this.appliedCardHeight &&
       clipInset === this.appliedClipInset &&
       left === this.appliedCardLeft &&
@@ -124,6 +126,62 @@ export class SheetCard {
     card.style.clipPath = this.clipsToCard()
       ? `inset(0px ${right}px ${clipInset}px ${left}px round ${this.cardCorners})`
       : '';
+  }
+
+  private updateCornerRadii(position: number) {
+    if (!this.cornerRadiiDirty && !this.hasDetentCornerRadii) return false;
+    const { config, detents, elements } = this.host;
+    if (config === null || elements === null) return false;
+    this.cornerRadiiDirty = false;
+    let lowerRadius = -1;
+    let upperRadius = -1;
+    let progress = 0;
+    if (this.hasDetentCornerRadii && detents.length > 0) {
+      const upper = detents.findIndex((detent) => position < detent.position);
+      const lower = upper < 0 ? detents.length - 1 : Math.max(upper - 1, 0);
+      lowerRadius = this.cornerStyleAt(lower)?.cornerRadius ?? -1;
+      if (upper > lower) {
+        const span = detents[upper]!.position - detents[lower]!.position;
+        const target = this.cornerStyleAt(upper);
+        const distance = target?.cornerRadiusTransitionDistance || span;
+        upperRadius = target?.cornerRadius ?? -1;
+        progress = clamp(
+          1 - (detents[upper]!.position - position) / Math.min(distance, span),
+          0,
+          1
+        );
+      }
+    }
+    let changed = false;
+    for (let corner = 0; corner < 4; corner++) {
+      const baseline = config.cornerRadii[corner] ?? 0;
+      const from = lowerRadius < 0 ? baseline : lowerRadius;
+      const to = upperRadius < 0 ? baseline : upperRadius;
+      const radius = from + (to - from) * progress;
+      if (this.appliedCornerRadii[corner] !== radius) {
+        this.appliedCornerRadii[corner] = radius;
+        changed = true;
+      }
+    }
+    if (changed) {
+      this.cardCorners = this.appliedCornerRadii
+        .map((radius) => `${radius}px`)
+        .join(' ');
+      elements.shadow.style.borderRadius = this.cardCorners;
+    }
+    return changed;
+  }
+
+  private cornerStyleAt(index: number) {
+    const { detents, config } = this.host;
+    const position = detents[index]!.position;
+    let first = index;
+    while (first > 0 && detents[first - 1]!.position === position) first--;
+    for (let member = first; detents[member]?.position === position; member++) {
+      const style = config?.detents[member];
+      if ((style?.cornerRadius ?? -1) >= 0) return style;
+    }
+    return config?.detents[first];
   }
 
   private currentPosition() {
@@ -173,7 +231,8 @@ export class SheetCard {
   /** Whether the card is cut out of the surface: rounded, or keeping gaps. */
   private clipsToCard() {
     return (
-      this.isCardRounded ||
+      this.hasDetentCornerRadii ||
+      this.appliedCornerRadii.some((radius) => radius > 0) ||
       this.isNarrowedByMaxWidth() ||
       this.host.rawDetents.some(
         (detent) =>

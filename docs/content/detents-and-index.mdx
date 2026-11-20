@@ -33,7 +33,8 @@ detents={[
 ```
 
 `value` takes any of the forms above. The options are [`insets`](#insets),
-[`programmatic`](#programmatic-only-detents) and, on `ModalBottomSheet`,
+[`programmatic`](#programmatic-only-detents), [corner radius](#corner-radius)
+options and, on `ModalBottomSheet`,
 [`scrimOpacity`](modal-sheets#scrim). A detent that leaves out an option,
 including a bare value, takes that option’s default, so `300` and
 `{ value: 300 }` are the same detent.
@@ -122,6 +123,41 @@ its bottom inset. The surface and content are laid out once, against the widest
 card, and scaled uniformly to fit narrower ones, as with iOS sheets, so content
 never reflows as the card’s edges move. Touches in the gaps reach the scrim or
 whatever is behind the sheet.
+
+## Corner radius
+
+Use `cornerRadius` on a detent to set all four corners at that height. Detents
+that omit it use the individual radii from `surfaceStyle`. An explicit `0`
+makes the corners square. A positive override rounds the bottom corners even
+when they are flush with the screen. The surface, content clip, and card shadows
+follow the same outline. Opting in keeps the content clipped to the card even at
+a square detent.
+
+By default, the radius blends linearly over the full distance between open
+detents. Set `cornerRadiusTransitionDistance` on the upper detent to blend
+only as the sheet reaches that detent or moves away from it. The distance uses
+layout units (points on iOS, dp on Android, and CSS pixels on the web) and is
+capped at the distance between those detents. Closed detents ignore corner
+options. The sheet retains the first open detent's corners as it slides
+between that detent and closed. When detents resolve to the same position, they
+share the first explicit radius and its transition distance. If none has an
+override, they share the surface radii and use the first detent's distance.
+
+```tsx
+<BottomSheet
+  topInset={0}
+  surfaceStyle={{ borderRadius: 32 }}
+  detents={[
+    0,
+    { value: '50%', insets: { left: 8, right: 8, bottom: 16 } },
+    { value: '100%', cornerRadius: 0, cornerRadiusTransitionDistance: 50 },
+  ]}
+  index={index}
+  onIndexChange={setIndex}
+>
+  {content}
+</BottomSheet>
+```
 
 ## Top inset
 

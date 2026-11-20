@@ -12,6 +12,7 @@ import com.swmansion.reactnativebottomsheet.closerequest.CloseRequestPresentatio
 /** Resolves the detents from props and layout, and keeps the sheet anchored to the result. */
 internal class Detents(
   private val state: SheetState,
+  private val card: Card,
   private val clipContainer: BottomSheetCardClipLayout,
   private val scrim: Scrim,
   private val contentRegion: ContentRegion,
@@ -38,7 +39,7 @@ internal class Detents(
     val hostWidth = state.width.toFloat()
     val isNarrowedByMaxWidth = state.columnWidth(hostWidth) < hostWidth
     state.hasCardGaps = state.hasInsetGaps || isNarrowedByMaxWidth
-    clipContainer.setClipsToCard(state.hasCardGaps)
+    card.updateClipping()
   }
 
   fun setDetents(raw: List<Map<String, Any>>) {
@@ -108,6 +109,18 @@ internal class Detents(
     }
     contentRegion.recomputeNativeGeometry()
     refreshDetentsFromLayout()
+    val cornerStyles = entries.map {
+      DetentCornerRadius(
+        radius =
+          (it["cornerRadius"] as? Number)
+            ?.toFloat()
+            ?.takeIf { radius -> radius >= 0f }
+            ?.times(state.density),
+        distance =
+          ((it["cornerRadiusTransitionDistance"] as? Number)?.toFloat() ?: 0f) * state.density,
+      )
+    }
+    card.setDetentCornerRadii(cornerStyles.takeIf { styles -> styles.any { it.radius != null } })
     // The re-resolved detents can change the card's shape at its current position.
     contentRegion.recomputeNativeGeometry()
     if (scrim.scrimOpacities != previousScrimOpacities) scrim.updateScrim()

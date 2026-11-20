@@ -24,12 +24,45 @@ internal class Card(
   var shadowContentOffsetX = 0f
   var shadowContentScale = 1f
 
+  private val surfaceRadii = FloatArray(4)
+  private val interpolatedRadii = FloatArray(4)
+  private var detentCornerRadii: List<DetentCornerRadius>? = null
+  private var cornerRadiiDirty = false
+
   /** Physical corner radii of the card in dp: top-left, top-right, bottom-right, bottom-left. */
   fun setSurfaceCornerRadii(values: List<Float>) {
-    val radii = FloatArray(4) { (values.getOrNull(it) ?: 0f).coerceAtLeast(0f) * state.density }
-    clipContainer.setCornerRadii(radii)
-    for (shadowView in shadowViews) shadowView.setCornerRadii(radii)
+    for (i in surfaceRadii.indices) {
+      surfaceRadii[i] = (values.getOrNull(i) ?: 0f).coerceAtLeast(0f) * state.density
+    }
+    cornerRadiiDirty = true
     updateCardGeometry()
+  }
+
+  fun setDetentCornerRadii(values: List<DetentCornerRadius>?) {
+    if (detentCornerRadii == values) return
+    detentCornerRadii = values
+    updateClipping()
+    cornerRadiiDirty = true
+    updateCardGeometry()
+  }
+
+  fun updateClipping() {
+    clipContainer.setClipsToCard(state.hasCardGaps || detentCornerRadii != null)
+  }
+
+  private fun updateCornerRadii(position: Float) {
+    val styles = detentCornerRadii
+    if (!cornerRadiiDirty && styles == null) return
+    cornerRadiiDirty = false
+    val radii =
+      if (styles == null) {
+        surfaceRadii
+      } else {
+        resolveCornerRadii(position, state.detentSpecs, styles, surfaceRadii, interpolatedRadii)
+        interpolatedRadii
+      }
+    clipContainer.setCornerRadii(radii)
+    for (shadowView in shadowViews) shadowView.setCornerRadii(radii, taperedSpread = styles != null)
   }
 
   /** Outset card shadows, with lengths in dp. */
@@ -91,6 +124,7 @@ internal class Card(
     val left = span.left
     val right = left + span.width
     val bottom = cardBottomAt(position, insets)
+    updateCornerRadii(position)
     clipContainer.setCard(left, 0f, right, bottom)
     updateContentTransform(left, right)
     updateCardShadows(left, right, bottom)

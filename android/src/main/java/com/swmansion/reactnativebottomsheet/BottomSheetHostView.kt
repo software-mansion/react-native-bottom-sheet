@@ -133,6 +133,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
   private val detents: Detents =
     Detents(
       state,
+      card,
       clipContainer,
       scrim,
       contentRegion,

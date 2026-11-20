@@ -109,6 +109,7 @@ const SHAPES: { label: string; style: SurfaceStyle | undefined }[] = [
 export const SurfaceStyleScreen = () => {
   const [index, setIndex] = useState(0);
   const [shapeIndex, setShapeIndex] = useState(0);
+  const [squareExpanded, setSquareExpanded] = useState(false);
   const sheetBottomPadding = useSheetBottomPadding();
   const shape = SHAPES[shapeIndex]!;
 
@@ -117,7 +118,17 @@ export const SurfaceStyleScreen = () => {
       title="Surface style"
       sheet={
         <ModalBottomSheet
-          detents={[0, 320, '90%']}
+          detents={[
+            0,
+            320,
+            squareExpanded
+              ? {
+                  value: '90%',
+                  cornerRadius: 0,
+                  cornerRadiusTransitionDistance: 50,
+                }
+              : '90%',
+          ]}
           index={index}
           onIndexChange={setIndex}
           scrimColor={MODAL_SCRIM_COLOR}
@@ -152,6 +163,10 @@ export const SurfaceStyleScreen = () => {
       }
     >
       <Button title="Open sheet" onPress={() => setIndex(1)} />
+      <Button
+        title={squareExpanded ? 'Keep corners at 90%' : 'Square corners at 90%'}
+        onPress={() => setSquareExpanded(!squareExpanded)}
+      />
     </DemoScreen>
   );
 };

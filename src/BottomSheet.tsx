@@ -131,8 +131,9 @@ export interface BottomSheetProps {
    * caps them to the available geometry.
    *
    * Each detent is a bare value or an object with its options:
-   * `programmatic`, `insets`, and, on `ModalBottomSheet`, `scrimOpacity`. A
-   * detent without an option takes its default.
+   * `programmatic`, `insets`, `cornerRadius`, `cornerRadiusTransitionDistance`,
+   * and, on `ModalBottomSheet`, `scrimOpacity`. A detent without an option
+   * takes its default.
    *
    * A detent’s value is the height of the card, and percentages resolve against
    * the available space: the host’s height minus `topInset` and that detent’s

@@ -1,4 +1,4 @@
-import UIKit
+import Foundation
 
 /// The space kept around the card at a detent.
 struct DetentInsets: Equatable {

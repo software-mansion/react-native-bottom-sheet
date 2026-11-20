@@ -82,6 +82,8 @@ public final class BottomSheetHostingView: UIView {
   /// unclipped, as before cards existed, so content drawn outside the sheet
   /// (e.g., a surface's own shadow) stays visible.
   var cornerRadii: [CGFloat] = [0, 0, 0, 0]
+  var detentCornerRadii: [DetentCornerRadius]?
+  var animatedCornerIndex: Int?
   var cornerCurve: CALayerCornerCurve = .circular
 
   /// Outset shadows cast by the card, each one drawn by its own layer below
@@ -211,6 +213,7 @@ public final class BottomSheetHostingView: UIView {
   static let springAnimationKey = "bottomSheetSettle"
   static let cardBoundsAnimationKey = "bottomSheetCardBounds"
   static let cardPositionAnimationKey = "bottomSheetCardPosition"
+  static let cardCornerRadiusAnimationKey = "bottomSheetCardCornerRadius"
   static let cardMaskAnimationKey = "bottomSheetCardMask"
   static let cardShadowAnimationKey = "bottomSheetCardShadow"
   static let cardShadowMaskAnimationKey = "bottomSheetCardShadowMask"
@@ -362,7 +365,7 @@ public final class BottomSheetHostingView: UIView {
     // wrapper's target size (and the overlay frame) into the shadow tree.
     eventDelegate?.bottomSheetHostingViewDidLayout(self)
 
-    if !hasLaidOut && !detentSpecs.isEmpty {
+    if !hasLaidOut, !detentSpecs.isEmpty {
       let indexToApply = pendingIndex ?? targetIndex
       let clampedIndex = max(0, min(detentSpecs.count - 1, indexToApply))
 
@@ -420,7 +423,7 @@ public final class BottomSheetHostingView: UIView {
     let card = presentedCardFrame
     guard card.contains(point) else { return false }
     guard isCardShaped else { return true }
-    return cardPath(in: card).contains(point)
+    return cardPath(in: card, radii: cardCornerRadii(forPosition: currentSheetHeight)).contains(point)
   }
 
   override public func point(inside point: CGPoint, with _: UIEvent?) -> Bool {
@@ -503,7 +506,20 @@ public final class BottomSheetHostingView: UIView {
     if hasLaidOut, rawDetentSpecs.last != previousTallestDetent || widestCardChanged {
       isContentRegionChangePending = true
     }
+    let cornerStyles = entries.map { entry in
+      let radius = CGFloat(truncating: entry["cornerRadius"] as? NSNumber ?? -1)
+      return DetentCornerRadius(
+        radius: radius >= 0 ? radius : nil,
+        distance: CGFloat(truncating: entry["cornerRadiusTransitionDistance"] as? NSNumber ?? 0)
+      )
+    }
+    let newCornerRadii = cornerStyles.contains { $0.radius != nil } ? cornerStyles : nil
+    let cornerRadiiChanged = newCornerRadii != detentCornerRadii
+    detentCornerRadii = newCornerRadii
     refreshDetentsFromLayout()
+    if cornerRadiiChanged {
+      updateCardShape(refreshSettle: true)
+    }
     // Set once the detents are re-resolved, so the scrim isn’t repainted
     // against the previous ones.
     scrimOpacities = entries.map { CGFloat(truncating: $0["scrimOpacity"] as? NSNumber ?? 1) }

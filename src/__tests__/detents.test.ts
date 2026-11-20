@@ -54,6 +54,49 @@ describe('normalizeDetents', () => {
   });
 });
 
+describe('detent corner radius', () => {
+  const normalize = (detents: Parameters<typeof normalizeDetents>[0]) =>
+    normalizeDetents(
+      detents,
+      0,
+      { maxWidth: 0, placementBias: 0.5 },
+      true,
+      false
+    );
+
+  test('preserves a zero override and ignores the option while closed', () => {
+    const detents = normalize([
+      { value: 0, cornerRadius: -1, cornerRadiusTransitionDistance: -1 },
+      '50%',
+      { value: '100%', cornerRadius: 0, cornerRadiusTransitionDistance: 50 },
+    ]);
+    expect(
+      detents.map(({ cornerRadius, cornerRadiusTransitionDistance }) => [
+        cornerRadius,
+        cornerRadiusTransitionDistance,
+      ])
+    ).toEqual([
+      [-1, 0],
+      [-1, 0],
+      [0, 50],
+    ]);
+  });
+
+  test('validates public radius and distance', () => {
+    expect(() => normalize([{ value: 300, cornerRadius: -1 }])).toThrow(
+      'cornerRadius'
+    );
+    expect(() =>
+      normalize([{ value: 300, cornerRadiusTransitionDistance: Infinity }])
+    ).toThrow('cornerRadiusTransitionDistance');
+    for (const distance of [-1, 0, NaN]) {
+      expect(() =>
+        normalize([{ value: 300, cornerRadiusTransitionDistance: distance }])
+      ).toThrow('cornerRadiusTransitionDistance');
+    }
+  });
+});
+
 describe('web placement', () => {
   const rawDetent = (placementBias: number) => ({
     value: 300,

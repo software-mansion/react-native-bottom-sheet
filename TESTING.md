@@ -33,3 +33,15 @@ bun run test:android:instrumented
 
 Instrumentation tests belong in `android/src/androidTest`. Prefer JVM or
 Robolectric coverage when Android framework behavior can be reproduced there.
+
+## Swift corner geometry tests
+
+The geometry and layer-selection tests run with the Swift toolchain on macOS
+without launching an app or simulator.
+
+```sh
+test_dir=$(mktemp -d)
+swiftc ios/HostingView/Types.swift ios/HostingView/DetentCornerRadii.swift \
+  tests/ios/DetentCornerRadiiTests.swift -o "$test_dir/detent-corners-tests"
+"$test_dir/detent-corners-tests"
+```

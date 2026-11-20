@@ -290,6 +290,18 @@ export const areRawDetentsEqual = (
       detent.placementBias === b[index]!.placementBias
   );
 
+export const areDetentCornerStylesEqual = (
+  a: ReadonlyArray<RawDetent>,
+  b: ReadonlyArray<RawDetent>
+) =>
+  a.length === b.length &&
+  a.every(
+    (detent, index) =>
+      detent.cornerRadius === b[index]!.cornerRadius &&
+      detent.cornerRadiusTransitionDistance ===
+        b[index]!.cornerRadiusTransitionDistance
+  );
+
 // Compared apart from `areRawDetentsEqual`: A scrim change only repaints the
 // scrim, and doesn’t re-resolve the detents.
 export const areScrimOpacitiesEqual = (

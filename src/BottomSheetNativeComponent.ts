@@ -30,6 +30,10 @@ type NativeDetent = Readonly<{
   placementBias: CodegenTypes.Double;
   // The scrim’s opacity at this detent, in 0-1. Ignored by inline sheets.
   scrimOpacity: CodegenTypes.Double;
+  // -1 inherits the surface radii; 0 is an explicit square corner.
+  cornerRadius: CodegenTypes.Double;
+  // 0 blends over the entire interval.
+  cornerRadiusTransitionDistance: CodegenTypes.Double;
 }>;
 
 export interface NativeProps extends ViewProps {

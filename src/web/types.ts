@@ -19,6 +19,8 @@ export type RawDetent = Readonly<{
   placementBias: number;
   /** The scrim’s opacity at this detent, in 0-1. */
   scrimOpacity: number;
+  cornerRadius?: number;
+  cornerRadiusTransitionDistance?: number;
 }>;
 
 export type ResolvedDetent = Readonly<{
