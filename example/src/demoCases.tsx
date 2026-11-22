@@ -142,6 +142,11 @@ export const DEMO_CASES: DemoCase[] = [
     href: '/keyboard-aware-list',
   },
   {
+    key: 'native-keyboard-avoidance',
+    title: 'Native keyboard avoidance',
+    href: '/native-keyboard-avoidance',
+  },
+  {
     key: 'scrim-opacity',
     title: 'Per-detent scrim opacity',
     href: '/scrim-opacity',

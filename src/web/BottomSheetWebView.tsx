@@ -72,6 +72,12 @@ export const BottomSheetView = (props: BottomSheetViewProps) => {
     // Android only. Taken out of the props for the same reason.
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     surfaceElevation,
+    // Native only: the browser handles the on-screen keyboard itself. Taken
+    // out of the props for the same reason.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    keyboardAvoidance,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    keyboardOffset,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     surfaceShadowColor,
     onIndexChange,

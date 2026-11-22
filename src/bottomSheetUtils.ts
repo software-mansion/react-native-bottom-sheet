@@ -602,6 +602,19 @@ export const validateIndex = (index: number, detentCount: number) => {
   }
 };
 
+/**
+ * Validates `keyboardOffset`, a distance in points. Negative values are
+ * allowed: they tuck the card's bottom behind the keyboard.
+ */
+export const validateKeyboardOffset = (keyboardOffset: number | undefined) => {
+  if (keyboardOffset === undefined) return;
+  if (!Number.isFinite(keyboardOffset)) {
+    throw new Error(
+      `Invalid bottom sheet keyboardOffset: received ${String(keyboardOffset)}. Expected a finite number of points.`
+    );
+  }
+};
+
 const SECONDS_LIKE_SETTLE_DURATION = 10;
 let hasWarnedAboutSettleDurationUnit = false;
 

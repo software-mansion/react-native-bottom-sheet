@@ -116,6 +116,13 @@ export default function RootLayout() {
               options={{ title: 'Keyboard-aware list', headerShown: false }}
             />
             <Stack.Screen
+              name="native-keyboard-avoidance"
+              options={{
+                title: 'Native keyboard avoidance',
+                headerShown: false,
+              }}
+            />
+            <Stack.Screen
               name="scrim-opacity"
               options={{
                 title: 'Per-detent scrim opacity',

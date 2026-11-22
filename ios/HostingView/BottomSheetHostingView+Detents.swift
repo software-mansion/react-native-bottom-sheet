@@ -5,7 +5,7 @@ extension BottomSheetHostingView {
   /// inset that actually overlaps this view. Measured from real window geometry
   /// in every mode — inline, portal, and overlay — so no JS-estimated dimensions
   /// are involved. Before the view is in a window, nothing overlaps it.
-  private var statusBarOverlap: CGFloat {
+  var statusBarOverlap: CGFloat {
     guard let window else { return 0 }
     let originYInWindow = convert(CGPoint.zero, to: window).y
     return min(max(0, window.safeAreaInsets.top - originYInWindow), bounds.height)

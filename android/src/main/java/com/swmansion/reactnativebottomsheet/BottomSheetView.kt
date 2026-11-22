@@ -178,6 +178,27 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
       host.scrollCollapseCoordination = value
     }
 
+  var keyboardAvoidance: Boolean
+    get() = host.keyboardAvoidance
+    set(value) {
+      host.keyboardAvoidance = value
+      overlayDialog?.window?.let(::applySoftInputMode)
+    }
+
+  var keyboardOffset: Float
+    get() = host.keyboardOffset
+    set(value) {
+      host.keyboardOffset = value
+    }
+
+  // With the sheet avoiding the keyboard, the overlay window must neither pan nor resize: it gets
+  // the IME insets (and their animation) instead. Edge-to-edge, `adjustResize` does exactly that.
+  private fun applySoftInputMode(window: Window) {
+    if (host.keyboardAvoidance) {
+      window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+    }
+  }
+
   var settleDuration: Float
     get() = host.settleDuration
     set(value) {
@@ -389,6 +410,7 @@ class BottomSheetView(context: Context) : ReactViewGroup(context), LifecycleEven
     window.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
     // The sheet runs its own enter/exit animation; suppress the dialog's.
     window.setWindowAnimations(0)
+    applySoftInputMode(window)
     window.enableTransparentEdgeToEdge(activity)
 
     // Start non-interactive (closed): pass touches and focus to the screen behind

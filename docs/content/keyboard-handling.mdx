@@ -6,7 +6,7 @@ import { KeyboardPaddingExample } from '@site/src/examples/keyboard-handling';
 
 # Keyboard handling
 
-The sheet does not apply keyboard avoidance automatically. This keeps the
+By default, the sheet does not apply keyboard avoidance. This keeps the
 component unopinionated and lets your app choose the keyboard strategy that
 matches its layout: resize content, add bottom padding, use a keyboard-aware
 scroll view, or rely on platform behavior.
@@ -29,3 +29,37 @@ instead of adding its own resize animation.
   {/* Content with keyboard-driven bottom padding. */}
 </ModalBottomSheet>
 ```
+
+## Native keyboard avoidance
+
+Pass `keyboardAvoidance` to let the sheet avoid the keyboard natively. While a
+text input inside the sheet is focused, the keyboard acts as the new bottom of
+the screen: the sheet moves up in the same animation as the keyboard (on
+Android, frame by frame through the IME insets animation). Dragging, snapping,
+detents and the scrim work as before.
+
+If the sheet can't move up any further, because its top would pass the
+detent's top inset, the scroll view holding the focused input gets extra bottom
+space for the part still under the keyboard, and the input is scrolled above
+the keyboard. Moving focus to another input while the keyboard is up, for
+example with the Next key, scrolls it into view the same way.
+
+`keyboardOffset` adds space, in points, between the card's bottom and the
+keyboard, on top of the detent's bottom inset. A negative value tucks the
+card's bottom, such as its safe-area padding, behind the keyboard.
+
+```tsx
+<ModalBottomSheet
+  detents={[0, 'content']}
+  index={index}
+  onIndexChange={setIndex}
+  surface={/* ... */}
+  keyboardAvoidance
+  keyboardOffset={-(insets.bottom + 8)}
+>
+  <ScrollView style={{ flexGrow: 0 }}>{/* Inputs */}</ScrollView>
+</ModalBottomSheet>
+```
+
+Inputs outside the sheet don't move it, and everything is restored when the
+keyboard hides. `keyboardAvoidance` has no effect on web.

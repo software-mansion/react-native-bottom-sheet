@@ -16,6 +16,7 @@ type ValidationCase = Readonly<{
   index: number;
   topInset?: number;
   settleDuration?: number;
+  keyboardOffset?: number;
   // Presents the case in a `ModalBottomSheet`, whose detents can set
   // `scrimOpacity`.
   modal?: boolean;
@@ -37,6 +38,12 @@ const VALIDATION_CASES: ValidationCase[] = [
     detents: [0, 'content'],
     index: 0,
     settleDuration: 0,
+  },
+  {
+    label: 'keyboardOffset: NaN',
+    detents: [0, 'content'],
+    index: 0,
+    keyboardOffset: NaN,
   },
   {
     label: 'insets.left: -1',
@@ -97,6 +104,7 @@ export const InvalidDetentsScreen = () => {
             index={validationCase.index}
             topInset={validationCase.topInset}
             settleDuration={validationCase.settleDuration}
+            keyboardOffset={validationCase.keyboardOffset}
             surface={<SheetBackground style={StyleSheet.absoluteFill} />}
           >
             <View>

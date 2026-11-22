@@ -177,6 +177,14 @@ class BottomSheetViewManager :
     view.scrollCollapseCoordination = value
   }
 
+  override fun setKeyboardAvoidance(view: BottomSheetView, value: Boolean) {
+    view.keyboardAvoidance = value
+  }
+
+  override fun setKeyboardOffset(view: BottomSheetView, value: Double) {
+    view.keyboardOffset = value.toFloat()
+  }
+
   override fun setSettleDuration(view: BottomSheetView, value: Double) {
     view.settleDuration = value.toFloat()
   }

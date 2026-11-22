@@ -173,6 +173,15 @@ using namespace facebook::react;
     _sheetView.scrollCollapseCoordination = newViewProps.scrollCollapseCoordination;
   }
 
+  // Compared against native state, so a recycled view is right too.
+  if (newViewProps.keyboardAvoidance != _sheetView.keyboardAvoidance) {
+    _sheetView.keyboardAvoidance = newViewProps.keyboardAvoidance;
+  }
+
+  if (newViewProps.keyboardOffset != _sheetView.keyboardOffset) {
+    _sheetView.keyboardOffset = newViewProps.keyboardOffset;
+  }
+
   if (newViewProps.settleDuration != oldViewProps.settleDuration) {
     _sheetView.settleDuration = newViewProps.settleDuration;
   }

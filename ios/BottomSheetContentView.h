@@ -32,6 +32,8 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic) NSInteger scrollExpandCoordination;
 @property (nonatomic) NSInteger scrollCollapseCoordination;
 @property (nonatomic) NSTimeInterval settleDuration;
+@property (nonatomic) BOOL keyboardAvoidance;
+@property (nonatomic) CGFloat keyboardOffset;
 @property (nonatomic) BOOL hasCloseRequestHandler;
 @property (nonatomic, readonly) UIView *sheetContainer;
 @property (nonatomic, readonly) BOOL isModalAccessibilityActive;

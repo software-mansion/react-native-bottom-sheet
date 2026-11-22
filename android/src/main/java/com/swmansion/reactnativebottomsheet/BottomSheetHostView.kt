@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.view.WindowInsets
 import androidx.core.view.NestedScrollingParent3
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.facebook.react.uimanager.PointerEvents
 import com.facebook.react.uimanager.StateWrapper
 import com.facebook.react.views.view.ReactViewGroup
@@ -17,6 +18,7 @@ import com.swmansion.reactnativebottomsheet.host.ContentRegion
 import com.swmansion.reactnativebottomsheet.host.DetentInsets
 import com.swmansion.reactnativebottomsheet.host.Detents
 import com.swmansion.reactnativebottomsheet.host.Gestures
+import com.swmansion.reactnativebottomsheet.host.KeyboardAvoidance
 import com.swmansion.reactnativebottomsheet.host.Scrim
 import com.swmansion.reactnativebottomsheet.host.ScrollCoordination
 import com.swmansion.reactnativebottomsheet.host.SheetHost
@@ -122,6 +124,28 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
       override fun refreshDetentsFromLayout() = detents.refreshDetentsFromLayout()
     }
   private val scrim = Scrim(state)
+  private val keyboard =
+    KeyboardAvoidance(state, clipContainer) { lift ->
+      // The lift moves the container's layout, leaving `translationY` to drags and settles.
+      sheetContainer.offsetTopAndBottom(-lift - sheetContainer.top)
+      updateScrimDismissView()
+    }
+
+  /** Lifts the sheet above the keyboard while an input inside it is focused. */
+  var keyboardAvoidance: Boolean
+    get() = keyboard.enabled
+    set(value) {
+      keyboard.enabled = value
+    }
+
+  /** Extra dp between the card's bottom and the keyboard; negative tucks the card behind it. */
+  var keyboardOffset: Float = 0f
+    set(value) {
+      field = value
+      keyboard.offsetPx = value * state.density
+      keyboard.refit()
+    }
+
   private val card = Card(state, clipContainer, scrim)
   private val cardTouchSensor = BottomSheetCardTouchSensor(context, card::onTouchTargeting)
 
@@ -285,6 +309,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
     // onLayout callback. Schedule the same host layout pass explicitly so
     // close request eligibility cannot remain invalid after the attach.
     requestApplyInsets()
+    keyboard.onAttachedToWindow()
     contentRegion.recomputeNativeGeometry()
     removeCallbacks(ensureHostLayoutAfterAttach)
     post(ensureHostLayoutAfterAttach)
@@ -303,10 +328,12 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
   override fun onApplyWindowInsets(insets: WindowInsets): WindowInsets {
     // The default top inset can change without a resize.
     contentRegion.recomputeNativeGeometry()
+    keyboard.onApplyWindowInsets(WindowInsetsCompat.toWindowInsetsCompat(insets, this))
     return super.onApplyWindowInsets(insets)
   }
 
   override fun onDetachedFromWindow() {
+    keyboard.onDetachedFromWindow()
     removeCallbacks(ensureHostLayoutAfterAttach)
     hasPerformedHostLayoutSinceAttach = false
     notifyCloseRequestStateChanged()
@@ -381,6 +408,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
     card.updateCardGeometry()
     contentRegion.updateShadowState(sheetContainer.translationY)
     notifyCloseRequestStateChanged()
+    keyboard.refit()
   }
 
   override fun dispatchDraw(canvas: Canvas) {
@@ -395,7 +423,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
   // down to its new height.
   private fun layoutSheetContainer(viewWidth: Int, viewHeight: Int) {
     state.lastAppliedMaxDetentHeight = viewHeight.toFloat()
-    sheetContainer.layout(0, 0, viewWidth, viewHeight)
+    sheetContainer.layout(0, -keyboard.lift, viewWidth, viewHeight - keyboard.lift)
     cardTouchSensor.layout(0, 0, viewWidth, viewHeight)
     scrimDismissView.layout(0, 0, viewWidth, viewHeight)
     updateScrimDismissView()
@@ -408,7 +436,10 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
 
   fun setDetents(raw: List<Map<String, Any>>) = detents.setDetents(raw)
 
-  fun setIndex(newIndex: Int) = detents.setIndex(newIndex)
+  fun setIndex(newIndex: Int) {
+    detents.setIndex(newIndex)
+    keyboard.refit()
+  }
 
   fun setScrimColor(color: Int?) = scrim.setScrimColor(color)
 

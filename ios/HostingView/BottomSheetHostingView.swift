@@ -129,10 +129,46 @@ public final class BottomSheetHostingView: UIView {
     didSet {
       setNeedsLayout()
       updateScrim()
+      if detentSpecs != oldValue {
+        keyboardTargetDidChange()
+      }
     }
   }
 
-  var targetIndex: Int = 0
+  var targetIndex: Int = 0 {
+    didSet {
+      if targetIndex != oldValue {
+        keyboardTargetDidChange()
+      }
+    }
+  }
+
+  /// Lifts the sheet above the keyboard while a text input inside it is
+  /// focused. See `BottomSheetHostingView+Keyboard.swift`.
+  public var keyboardAvoidance: Bool = false {
+    didSet {
+      guard keyboardAvoidance != oldValue else { return }
+      if keyboardAvoidance {
+        startObservingKeyboard()
+      } else {
+        stopObservingKeyboard()
+      }
+    }
+  }
+
+  /// Extra distance between the card's bottom edge and the keyboard, on top of
+  /// the detent's bottom inset. Negative tucks the card's bottom behind it.
+  public var keyboardOffset: CGFloat = 0
+
+  /// The keyboard's end frame from its last notification, in screen
+  /// coordinates; nil while hidden.
+  var keyboardScreenFrame: CGRect?
+  /// How far the sheet container is currently lifted above its resting place.
+  var keyboardLift: CGFloat = 0
+  /// The scroll view given a bottom inset for the keyboard, and that inset.
+  weak var keyboardInsetScrollView: UIScrollView?
+  var keyboardInsetAmount: CGFloat = 0
+  var isKeyboardRefitScheduled = false
   public var animateIn: Bool = true
   public var animateContentHeight: Bool = true
 
@@ -347,7 +383,9 @@ public final class BottomSheetHostingView: UIView {
     let maxHeight = sheetContainerHeight
     lastAppliedMaxDetentHeight = maxHeight
     sheetContainer.bounds = CGRect(x: 0, y: 0, width: bounds.width, height: maxHeight)
-    sheetContainer.center = CGPoint(x: bounds.width / 2, y: bounds.height - maxHeight / 2)
+    sheetContainer.center = CGPoint(
+      x: bounds.width / 2, y: bounds.height - maxHeight / 2 - keyboardLift
+    )
 
     // The surface fills the full container so it always covers the visible sheet
     // (the container is translated to the current sheet position), regardless of
@@ -665,6 +703,9 @@ public final class BottomSheetHostingView: UIView {
     committedContentRegionInset = .nan
     appliedContentRegionInset = .nan
     surfaceView = nil
+    keyboardLift = 0
+    keyboardInsetScrollView = nil
+    keyboardInsetAmount = 0
     sheetContainer.transform = .identity
     scrimView.alpha = 0
     scrimView.isHidden = true
@@ -726,6 +767,7 @@ public final class BottomSheetHostingView: UIView {
   }
 
   deinit {
+    NotificationCenter.default.removeObserver(self)
     for recognizer in observedIndicatorDrags.allObjects {
       recognizer.removeTarget(self, action: nil)
     }

@@ -38,6 +38,7 @@ import {
   resolveSurfaceStyle,
   type SurfaceStyle,
   validateIndex,
+  validateKeyboardOffset,
   validateSettleDuration,
 } from './bottomSheetUtils';
 export type { SheetPlacement } from './cardPlacement';
@@ -279,6 +280,24 @@ export interface BottomSheetProps {
    * @default 450
    */
   settleDuration?: number;
+  /**
+   * Lift the sheet above the software keyboard while a text input inside it is
+   * focused, in sync with the keyboard's animation. A tall sheet stops below
+   * its top inset; what stays covered is added to the bottom inset of the
+   * focused input's scroll view, which scrolls the input into view. No effect
+   * on web.
+   *
+   * @default false
+   */
+  keyboardAvoidance?: boolean;
+  /**
+   * Extra points between the card's bottom edge and the keyboard's top, on top
+   * of the detent's bottom inset. Negative tucks the card's bottom (e.g., its
+   * safe-area padding) behind the keyboard.
+   *
+   * @default 0
+   */
+  keyboardOffset?: number;
 }
 
 type ModalOnlyBottomSheetProps = {
@@ -334,6 +353,8 @@ export const BottomSheet = (props: BottomSheetProps) => {
     scrimColor,
     scrimAccessibilityLabel,
     settleDuration,
+    keyboardAvoidance = false,
+    keyboardOffset = 0,
   } = props as BottomSheetInternalProps;
   const coordination = scrollCoordination ?? DEFAULT_SCROLL_COORDINATION;
   const resolvedExpandCoordination =
@@ -354,6 +375,7 @@ export const BottomSheet = (props: BottomSheetProps) => {
   // their requested height; native layout clamps both kinds to it.
   validateIndex(index, detents.length);
   validateSettleDuration(settleDuration);
+  validateKeyboardOffset(keyboardOffset);
   const isRTL = isLayoutRTL();
   const resolvedMaxWidth = resolveMaxWidth(maxWidth);
   const normalizedDetents = normalizeDetents(
@@ -526,6 +548,8 @@ export const BottomSheet = (props: BottomSheetProps) => {
           settleDuration={
             settleDuration === undefined ? 0 : settleDuration / 1000
           }
+          keyboardAvoidance={keyboardAvoidance}
+          keyboardOffset={keyboardOffset}
           scrimColor={scrimColor}
           // An empty label would leave the button unlabeled, so it falls back too.
           scrimAccessibilityLabel={scrimAccessibilityLabel || 'Dismiss'}

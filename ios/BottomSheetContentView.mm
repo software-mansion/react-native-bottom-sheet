@@ -75,6 +75,26 @@
   _impl.scrollCollapseCoordination = scrollCollapseCoordination;
 }
 
+- (BOOL)keyboardAvoidance
+{
+  return _impl.keyboardAvoidance;
+}
+
+- (void)setKeyboardAvoidance:(BOOL)keyboardAvoidance
+{
+  _impl.keyboardAvoidance = keyboardAvoidance;
+}
+
+- (CGFloat)keyboardOffset
+{
+  return _impl.keyboardOffset;
+}
+
+- (void)setKeyboardOffset:(CGFloat)keyboardOffset
+{
+  _impl.keyboardOffset = keyboardOffset;
+}
+
 - (NSTimeInterval)settleDuration
 {
   return _impl.settleDuration;
