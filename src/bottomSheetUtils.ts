@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import {
   I18nManager,
   Platform,
@@ -16,6 +17,19 @@ import {
 // `BottomSheetHostView.kt`; keep the three in sync. The web host imports it.
 export const CONTENT_HEIGHT_MARKER_NATIVE_ID =
   'swm-bottom-sheet-content-height-marker';
+// Identifies the optional native anchor in both the native host and Fabric.
+export const BOTTOM_ANCHORED_CONTENT_NATIVE_ID =
+  'swm-bottom-sheet-bottom-anchored-content';
+
+export const resolveBottomAnchoredContent = (
+  platform: typeof Platform.OS,
+  content: ReactNode,
+  iosContent: ReactNode
+) => {
+  if (platform !== 'ios' && platform !== 'android') return null;
+  const slot = content ?? (platform === 'ios' ? iosContent : null);
+  return typeof slot === 'boolean' ? null : slot;
+};
 
 /**
  * The shape and shadow of a sheet's surface, stated in standard style
@@ -345,6 +359,12 @@ export type DetentConfig = Readonly<{
    * card. Ignored at a closed detent.
    */
   insets?: DetentInsets;
+  /**
+   * Distance in layout units from the top of the card to the upper edge of
+   * the visible and interactive area of bottom-anchored content.
+   * Interpolates between open detents and defaults to zero.
+   */
+  contentClipTopInset?: number;
 }>;
 
 /** A modal sheet’s detent with its options. */
@@ -380,6 +400,7 @@ type NormalizedDetent = Readonly<{
   /** The sheet's `placement` as a physical bias. The same on every detent. */
   placementBias: number;
   scrimOpacity: number;
+  contentClipTopInset: number;
 }>;
 
 /** The sheet-wide horizontal layout, carried on every native detent. */
@@ -511,6 +532,15 @@ const normalizeDetent = (
   const { kind, value } = parseDetentValue(config.value, index);
   const isClosed = isNormalizedDetentClosed({ kind, value });
   const insets = resolveDetentInsets(config.insets, index, isRTL);
+  const anchorInset = isClosed ? 0 : (config.contentClipTopInset ?? 0);
+  if (!isFiniteNonNegative(anchorInset)) {
+    throw invalidDetentOptionError(
+      'contentClipTopInset',
+      anchorInset,
+      index,
+      'a finite, non-negative number'
+    );
+  }
   // Only a modal sheet has a scrim, so an inline sheet ignores the option
   // rather than validating it.
   const scrimOpacity =
@@ -531,6 +561,7 @@ const normalizeDetent = (
     widestCard: false,
     ...cardLayout,
     scrimOpacity,
+    contentClipTopInset: anchorInset,
   };
 };
 

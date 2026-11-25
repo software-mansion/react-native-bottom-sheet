@@ -33,8 +33,9 @@ detents={[
 ```
 
 `value` takes any of the forms above. The options are [`insets`](#insets),
-[`programmatic`](#programmatic-only-detents) and, on `ModalBottomSheet`,
-[`scrimOpacity`](modal-sheets#scrim). A detent that leaves out an option,
+[`programmatic`](#programmatic-only-detents),
+[`contentClipTopInset`](position-tracking#setting-the-top-edge-of-the-visible-content) on iOS and Android,
+and [`scrimOpacity`](modal-sheets#scrim) on `ModalBottomSheet`. A detent that leaves out an option,
 including a bare value, takes that option’s default, so `300` and
 `{ value: 300 }` are the same detent.
 

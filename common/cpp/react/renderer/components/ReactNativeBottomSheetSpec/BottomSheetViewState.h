@@ -34,6 +34,14 @@ class BottomSheetViewState final {
             data.count("contentScale") != 0
                 ? static_cast<float>(data["contentScale"].getDouble())
                 : previousState.contentScale),
+        cardLeft(
+            data.count("cardLeft") != 0
+                ? static_cast<Float>(data["cardLeft"].getDouble())
+                : previousState.cardLeft),
+        cardHeight(
+            data.count("cardHeight") != 0
+                ? static_cast<Float>(data["cardHeight"].getDouble())
+                : previousState.cardHeight),
         frameSize(
             data.count("frameWidth") != 0 && data.count("frameHeight") != 0
                 ? Size{static_cast<Float>(data["frameWidth"].getDouble()),
@@ -59,6 +67,9 @@ class BottomSheetViewState final {
   float contentOffsetX{0};
   float contentOffsetY{0};
   float contentScale{1};
+  // The anchored wrapper uses the visible edge for its measured offset.
+  Float cardLeft{0};
+  Float cardHeight{0};
   // Real measured size (dp) of the sheet in its window, reported natively once
   // it lays out. Consumed by the component descriptor only in window-overlay
   // mode, where the sheet is hoisted out of its in-tree slot; zero until the
@@ -80,6 +91,7 @@ class BottomSheetViewState final {
   folly::dynamic getDynamic() const {
     return folly::dynamic::object("contentOffsetX", contentOffsetX)(
         "contentOffsetY", contentOffsetY)("contentScale", contentScale)(
+        "cardLeft", cardLeft)("cardHeight", cardHeight)(
         "frameWidth", frameSize.width)("frameHeight", frameSize.height)(
         "contentRegionInset", contentRegionInset)(
         "surfaceOverflow", surfaceOverflow);

@@ -30,6 +30,7 @@ type NativeDetent = Readonly<{
   placementBias: CodegenTypes.Double;
   // The scrim’s opacity at this detent, in 0-1. Ignored by inline sheets.
   scrimOpacity: CodegenTypes.Double;
+  contentClipTopInset: CodegenTypes.Double;
 }>;
 
 export interface NativeProps extends ViewProps {

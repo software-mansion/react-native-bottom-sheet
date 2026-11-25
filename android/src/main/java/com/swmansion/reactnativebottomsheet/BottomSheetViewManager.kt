@@ -123,12 +123,12 @@ class BottomSheetViewManager :
           "insetRight" to inset("insetRight"),
           "insetBottom" to inset("insetBottom"),
           "widestCard" to (map.hasKey("widestCard") && map.getBoolean("widestCard")),
+          "contentClipTopInset" to inset("contentClipTopInset"),
           "maxWidth" to inset("maxWidth"),
           "placementBias" to
             (if (map.hasKey("placementBias")) map.getDouble("placementBias") else 0.5),
-          "scrimOpacity" to
-            (if (map.hasKey("scrimOpacity")) map.getDouble("scrimOpacity") else 1.0),
-        ),
+          "scrimOpacity" to (if (map.hasKey("scrimOpacity")) map.getDouble("scrimOpacity") else 1.0),
+        )
       )
     }
     view.setDetents(list)
@@ -211,7 +211,7 @@ class BottomSheetViewManager :
             blurRadius = shadow.getDouble("blurRadius").toFloat(),
             spreadDistance = shadow.getDouble("spreadDistance").toFloat(),
             color = shadowColor(view, shadow),
-          ),
+          )
         )
       }
     }

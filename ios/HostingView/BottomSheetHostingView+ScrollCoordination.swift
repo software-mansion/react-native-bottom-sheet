@@ -22,9 +22,8 @@ private extension UIScrollView {
 final class ScrollIndicatorFit {
   private static var key: UInt8 = 0
 
-  var callerInset: CGFloat
-  var appliedInset: CGFloat
-  let inverted: Bool
+  var callerInset: UIEdgeInsets
+  var appliedInset: UIEdgeInsets
   /// The sheet fitting the indicator now. Only it restores the caller's inset.
   weak var owner: AnyObject?
   /// Tells the owner when the scroll view leaves the window, so a list whose
@@ -32,10 +31,9 @@ final class ScrollIndicatorFit {
   /// recycles it into a screen no sheet fits.
   let departure = ScrollIndicatorFitDeparture()
 
-  init(inset: CGFloat, inverted: Bool) {
+  init(inset: UIEdgeInsets) {
     callerInset = inset
     appliedInset = inset
-    self.inverted = inverted
   }
 
   static func attached(to scrollView: UIScrollView) -> ScrollIndicatorFit? {
@@ -359,6 +357,9 @@ extension BottomSheetHostingView {
         setContentInteractionEnabled(false)
       }
     }
+    if bottomAnchoredContentView != nil, activeSpring != nil {
+      return presentedTarget(at: sheetContainer.convert(location, to: self), event: nil)
+    }
     return sheetContainer.hitTest(location, with: nil)
   }
 
@@ -488,12 +489,12 @@ extension BottomSheetHostingView {
   func fitScrollIndicators(of states: [ActiveScrollViewState]) {
     for state in states {
       guard let scrollView = state.scrollView else { continue }
-      fitScrollIndicator(of: scrollView, inverted: state.inverted, shift: 0)
+      fitScrollIndicator(of: scrollView, translation: currentTranslationY)
     }
   }
 
   private func fitScrollIndicator(of scrollView: UIScrollView) {
-    fitScrollIndicator(of: scrollView, inverted: isInverted(scrollView), shift: 0)
+    fitScrollIndicator(of: scrollView, translation: currentTranslationY)
   }
 
   /// Refits every scroll view fitted so far, as the sheet moves. A visible
@@ -504,7 +505,7 @@ extension BottomSheetHostingView {
   /// gets its caller's inset back and is no longer fitted, unless another sheet
   /// has taken its fit over.
   func refitScrollIndicators(atTranslation translation: CGFloat? = nil) {
-    let shift = translation.map { $0 - sheetContainer.transform.ty } ?? 0
+    let ty = translation ?? currentTranslationY
     for case let scrollView as UIScrollView in scrollIndicatorFits.keyEnumerator().allObjects {
       guard ScrollIndicatorFit.attached(to: scrollView)?.owner === self else {
         scrollIndicatorFits.removeObject(forKey: scrollView)
@@ -514,7 +515,7 @@ extension BottomSheetHostingView {
         releaseScrollIndicatorFit(of: scrollView)
         continue
       }
-      fitScrollIndicator(of: scrollView, inverted: isInverted(scrollView), shift: shift)
+      fitScrollIndicator(of: scrollView, translation: ty)
     }
   }
 
@@ -538,10 +539,11 @@ extension BottomSheetHostingView {
   private func restoreCallerInset(of scrollView: UIScrollView, fit: ScrollIndicatorFit) {
     ScrollIndicatorFit.attach(nil, to: scrollView)
     let insets = scrollView.verticalScrollIndicatorInsets
-    if fit.inverted, insets.top == fit.appliedInset {
-      scrollView.verticalScrollIndicatorInsets.top = fit.callerInset
-    } else if !fit.inverted, insets.bottom == fit.appliedInset {
-      scrollView.verticalScrollIndicatorInsets.bottom = fit.callerInset
+    if insets.top == fit.appliedInset.top {
+      scrollView.verticalScrollIndicatorInsets.top = fit.callerInset.top
+    }
+    if insets.bottom == fit.appliedInset.bottom {
+      scrollView.verticalScrollIndicatorInsets.bottom = fit.callerInset.bottom
     }
   }
 
@@ -564,18 +566,30 @@ extension BottomSheetHostingView {
     return false
   }
 
-  private func fitScrollIndicator(of scrollView: UIScrollView, inverted: Bool, shift: CGFloat) {
-    if let fit = ScrollIndicatorFit.attached(to: scrollView), fit.inverted != inverted {
-      // The list flipped: its indicator's bottom is the other edge now.
-      restoreCallerInset(of: scrollView, fit: fit)
+  private func fitScrollIndicator(of scrollView: UIScrollView, translation: CGFloat) {
+    let hiddenTop: CGFloat
+    let hiddenBottom: CGFloat
+    if let wrapper = bottomAnchoredContentView, scrollView.isDescendant(of: wrapper) {
+      let position = sheetContainerHeight - translation
+      let card = cardRect(forPosition: position)
+      let transform = childToSheet(wrapper, card: card)
+      guard transform.d > 0 else { return }
+      let viewport = bounds.offsetBy(dx: sheetContainer.bounds.midX - sheetContainer.center.x,
+                                     dy: sheetContainer.bounds.midY - sheetContainer.center.y - translation)
+      let visible = bottomAnchorBounds(in: card, position: position).intersection(viewport)
+      guard !visible.isNull else { return }
+      let track = wrapper.convert(visible.applying(transform.inverted()), to: scrollView)
+      hiddenTop = min(scrollView.bounds.height, max(0, track.minY - scrollView.bounds.minY))
+      hiddenBottom = min(scrollView.bounds.height, max(0, scrollView.bounds.maxY - track.maxY))
+    } else {
+      let shift = translation - sheetContainer.transform.ty
+      let hidden = max(0, scrollView.convert(scrollView.bounds, to: self).maxY + shift - bounds.height)
+      let inverted = isInverted(scrollView)
+      hiddenTop = inverted ? hidden : 0
+      hiddenBottom = inverted ? 0 : hidden
     }
-    let hidden = max(0, scrollView.convert(scrollView.bounds, to: self).maxY + shift - bounds.height)
-    let insets = scrollView.verticalScrollIndicatorInsets
-    let current = inverted ? insets.top : insets.bottom
-    // A fit another sheet made carries the caller's inset over, so its
-    // adjustment isn't taken for the caller's.
-    let fit = ScrollIndicatorFit.attached(to: scrollView)
-      ?? ScrollIndicatorFit(inset: current, inverted: inverted)
+    let current = scrollView.verticalScrollIndicatorInsets
+    let fit = ScrollIndicatorFit.attached(to: scrollView) ?? ScrollIndicatorFit(inset: current)
     fit.owner = self
     fit.departure.onLeaveWindow = { [weak self, weak scrollView] in
       // The whole sheet leaving the window keeps its fits.
@@ -585,15 +599,18 @@ extension BottomSheetHostingView {
     ScrollIndicatorFit.attach(fit, to: scrollView)
     scrollIndicatorFits.setObject(fit, forKey: scrollView)
     // Any other inset than the one applied last is the caller's.
-    if current != fit.appliedInset {
-      fit.callerInset = current
+    if current.top != fit.appliedInset.top {
+      fit.callerInset.top = current.top
     }
-    fit.appliedInset = fit.callerInset + hidden
-    guard fit.appliedInset != current else { return }
-    if inverted {
-      scrollView.verticalScrollIndicatorInsets.top = fit.appliedInset
-    } else {
-      scrollView.verticalScrollIndicatorInsets.bottom = fit.appliedInset
+    if current.bottom != fit.appliedInset.bottom {
+      fit.callerInset.bottom = current.bottom
+    }
+    var adjusted = current
+    adjusted.top = fit.callerInset.top + hiddenTop
+    adjusted.bottom = fit.callerInset.bottom + hiddenBottom
+    fit.appliedInset = adjusted
+    if adjusted != current {
+      scrollView.verticalScrollIndicatorInsets = adjusted
     }
   }
 

@@ -11,18 +11,57 @@ mock.module('react-native', () => ({
   StyleSheet: { flatten: (style: unknown) => style },
 }));
 
+let resolveBottomAnchoredContent: typeof import('../bottomSheetUtils').resolveBottomAnchoredContent;
 let normalizeDetents: typeof import('../bottomSheetUtils').normalizeDetents;
 let cardSpan: typeof import('../web/detents').cardSpan;
 let contentScale: typeof import('../web/detents').contentScale;
 let resolvePlacement: typeof import('../cardPlacement').resolvePlacement;
 
 beforeAll(async () => {
-  ({ normalizeDetents } = await import('../bottomSheetUtils'));
+  ({ normalizeDetents, resolveBottomAnchoredContent } =
+    await import('../bottomSheetUtils'));
   ({ cardSpan, contentScale } = await import('../web/detents'));
   ({ resolvePlacement } = await import('../cardPlacement'));
 });
 
+test('selects the native slot and preserves the iOS-only alias', () => {
+  expect(resolveBottomAnchoredContent('ios', undefined, 'legacy')).toBe(
+    'legacy'
+  );
+  expect(resolveBottomAnchoredContent('ios', 'shared', 'legacy')).toBe(
+    'shared'
+  );
+  expect(resolveBottomAnchoredContent('ios', false, 'legacy')).toBeNull();
+  expect(resolveBottomAnchoredContent('android', null, 'legacy')).toBeNull();
+  expect(resolveBottomAnchoredContent('android', 'shared', 'legacy')).toBe(
+    'shared'
+  );
+  expect(resolveBottomAnchoredContent('web', 'shared', 'legacy')).toBeNull();
+});
+
+const normalize = (detents: Parameters<typeof normalizeDetents>[0]) =>
+  normalizeDetents(
+    detents,
+    0,
+    { maxWidth: 0, placementBias: 0.5 },
+    true,
+    false
+  );
+
 describe('normalizeDetents', () => {
+  test('serializes the content clip inset at open detents and defaults to zero', () => {
+    const detents = normalize([
+      { value: 0, contentClipTopInset: 999 },
+      '25%',
+      { value: '50%', contentClipTopInset: 56 },
+      { value: '100%', contentClipTopInset: 104 },
+    ]);
+    expect(detents.map((d) => d.contentClipTopInset)).toEqual([0, 0, 56, 104]);
+    expect(() =>
+      normalize([{ value: '50%', contentClipTopInset: -1 }])
+    ).toThrow('contentClipTopInset');
+  });
+
   test('carries maxWidth and placement on every detent, the closed one too', () => {
     const detents = normalizeDetents(
       [0, { value: 300, insets: { left: 16, right: 16 } }, '100%'],

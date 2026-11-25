@@ -18,9 +18,11 @@ namespace facebook::react {
 // the geometry forever. Same convention as Android's pushStateSnapshot.
 void updateBottomSheetState(
     const State::Shared& state,
+    float cardLeft,
     float contentOffsetX,
     float contentOffsetY,
     float contentScale,
+    Float cardHeight,
     Size frameSize,
     Float contentRegionInset,
     Float surfaceOverflow);

@@ -8,6 +8,7 @@
 #include <react/renderer/core/StateData.h>
 #include <yoga/YGNodeStyle.h>
 
+#include <optional>
 #include <string_view>
 
 namespace facebook::react {
@@ -72,19 +73,29 @@ class BottomSheetCardContent {
   };
 
   virtual Kind kind() const = 0;
+  virtual bool isBottomAnchored() const = 0;
 
-  bool hasCardGeometry(Float offsetX, Float scale, Float bottomOverflow) const {
+  bool hasCardGeometry(
+      Float offsetX,
+      Float scale,
+      Float bottomOverflow,
+      std::optional<Float> cardBottom) const {
     return cardOffsetX_ == offsetX && cardScale_ == scale &&
-        bottomOverflow_ == bottomOverflow;
+        bottomOverflow_ == bottomOverflow && cardBottom_ == cardBottom;
   }
 
   bool hasBottomOverflow(Float bottomOverflow) const {
     return bottomOverflow_ == bottomOverflow;
   }
 
-  void setCardGeometry(Float offsetX, Float scale, Float bottomOverflow) {
+  void setCardGeometry(
+      Float offsetX,
+      Float scale,
+      Float bottomOverflow,
+      std::optional<Float> cardBottom) {
     cardOffsetX_ = offsetX;
     cardScale_ = scale;
+    cardBottom_ = cardBottom;
     if (bottomOverflow_ != bottomOverflow) {
       bottomOverflow_ = bottomOverflow;
       applyBottomOverflow();
@@ -96,8 +107,9 @@ class BottomSheetCardContent {
   BottomSheetCardContent(const BottomSheetCardContent&) = default;
   ~BottomSheetCardContent() = default;
 
-  // Extends the child's Yoga box below the sheet by `bottomOverflow_`: scaled
-  // down, it would otherwise end above a narrow card's bottom edge.
+  // Adjusts the child's bottom Yoga edge. The surface and in-flow content
+  // can extend below the host to keep covering narrower cards after scaling.
+  // The anchored absolute slot can also reserve the host's bottom inset.
   virtual void applyBottomOverflow() = 0;
 
   Float bottomOverflow_{0};
@@ -107,19 +119,26 @@ class BottomSheetCardContent {
   // metrics apply a transform: p ↦ center + scale · (p - center) + t equals
   // scale · p + offset when t = offset - (1 - scale) · center.
   Transform cardTransform(const Rect& frame) const {
-    if (cardScale_ == 1 && cardOffsetX_ == 0) {
+    if (cardScale_ == 1 && cardOffsetX_ == 0 && !cardBottom_) {
       return Transform::Identity();
     }
     auto center = frame.getCenter();
     auto transform = Transform::Scale(cardScale_, cardScale_, 1);
-    transform.matrix[12] = cardOffsetX_ - (1 - cardScale_) * center.x;
-    transform.matrix[13] = -(1 - cardScale_) * center.y;
+    transform.matrix[12] = cardOffsetX_ - (1 - cardScale_) * center.x
+        - (cardBottom_ ? cardScale_ * frame.origin.x : 0);
+    // The anchored wrapper reports the same extra vertical translation as
+    // its native view, so Fabric measures its children at their drawn position.
+    const auto anchorOffset = cardBottom_
+        ? *cardBottom_ - cardScale_ * (frame.origin.y + frame.size.height)
+        : 0;
+    transform.matrix[13] = anchorOffset - (1 - cardScale_) * center.y;
     return transform;
   }
 
  private:
   Float cardOffsetX_{0};
   Float cardScale_{1};
+  std::optional<Float> cardBottom_;
 };
 
 // A child of the sheet that follows the card. Fabric never mounts a shadow
@@ -168,6 +187,12 @@ class BottomSheetCardContentShadowNode
     return cardContentKind;
   }
 
+  bool isBottomAnchored() const override {
+    return cardContentKind == Kind::ContentWrapper &&
+        this->getConcreteProps().nativeId ==
+            "swm-bottom-sheet-bottom-anchored-content";
+  }
+
   // These views are the library's own and never take a style transform, so the
   // card's is the whole of it.
   Transform getTransform() const override {
@@ -176,7 +201,7 @@ class BottomSheetCardContentShadowNode
 
  protected:
   void applyBottomOverflow() override {
-    if (cardContentKind == Kind::Surface) {
+    if (cardContentKind == Kind::Surface || isBottomAnchored()) {
       YGNodeStyleSetPosition(&this->yogaNode_, YGEdgeBottom, -bottomOverflow_);
     } else {
       YGNodeStyleSetMargin(&this->yogaNode_, YGEdgeBottom, -bottomOverflow_);

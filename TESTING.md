@@ -33,3 +33,26 @@ bun run test:android:instrumented
 
 Instrumentation tests belong in `android/src/androidTest`. Prefer JVM or
 Robolectric coverage when Android framework behavior can be reproduced there.
+
+## Native bottom-anchored slot
+
+Run the Android host test against the generated Java delegate and Robolectric
+after preparing the example project:
+
+```sh
+./example/android/gradlew --project-dir example/android \
+  :swmansion_react-native-bottom-sheet:testDebugUnitTest --tests '*BottomSheetHostViewAnchorTest'
+```
+
+On an Apple silicon Mac with Xcode, run the UIKit host test through Mac Catalyst
+without starting a simulator:
+
+```sh
+test_dir=$(mktemp -d)
+sdk=$(xcrun --sdk macosx --show-sdk-path)
+swiftc -sdk "$sdk" -target arm64-apple-ios16.0-macabi \
+  -F "$sdk/System/iOSSupport/System/Library/Frameworks" \
+  -I "$sdk/System/iOSSupport/usr/include" \
+  ios/HostingView/*.swift tests/ios/BottomSheetHostSettleTests.swift -o "$test_dir/host-test"
+"$test_dir/host-test"
+```

@@ -341,17 +341,14 @@ extension BottomSheetHostingView {
     // So does a running settle's copy of it: the settle usually starts before
     // the layout of the same transaction lands. Commits run per frame, so only
     // rebuild it when the content actually moved.
-    if isContentAnimationStale {
-      addContentAnimation()
-    }
+    refreshCardAnimations()
     guard isContentRegionChangePending else { return }
     refreshDetentsFromLayout()
   }
 
-  /// The content wrapper: the surface is its sibling, so skip it and the
-  /// wrapper is whatever else the sheet mounts.
+  /// Only the regular children can determine a content-sized detent.
   func findContentView() -> UIView? {
-    clipContainer.subviews.first(where: { $0 !== surfaceView })
+    cardContentViews.first { $0 !== surfaceView && $0 !== bottomAnchoredContentView }
   }
 
   private func findContentHeightMarker() -> UIView? {
@@ -363,7 +360,7 @@ extension BottomSheetHostingView {
     return contentView.subviews.first { nativeID(of: $0) == Self.contentHeightMarkerNativeID }
   }
 
-  private func nativeID(of view: UIView) -> String? {
+  func nativeID(of view: UIView) -> String? {
     // Fabric stores the `nativeID` prop in RCTViewComponentView's `nativeId`
     // property. Its header is C++ and cannot be imported here, so read the
     // property by name; views that do not declare it are never the marker.

@@ -254,6 +254,8 @@ internal class ContentRegion(
         contentOffsetX = (card.shadowContentOffsetX / state.density).toDouble(),
         contentOffsetY = if (lastShadowOffsetY.isNaN()) 0.0 else lastShadowOffsetY.toDouble(),
         contentScale = card.shadowContentScale.toDouble(),
+        cardLeft = (card.shadowAnchorCardLeft / state.density).toDouble(),
+        cardHeight = (card.shadowAnchorCardHeight / state.density).toDouble(),
         frameWidth = (lastGeometryStateWidth / state.density).toDouble(),
         frameHeight = (lastGeometryStateHeight / state.density).toDouble(),
         contentRegionInset =
@@ -270,6 +272,8 @@ internal class ContentRegion(
     map.putDouble("contentOffsetX", snapshot.contentOffsetX)
     map.putDouble("contentOffsetY", snapshot.contentOffsetY)
     map.putDouble("contentScale", snapshot.contentScale)
+    map.putDouble("cardLeft", snapshot.cardLeft)
+    map.putDouble("cardHeight", snapshot.cardHeight)
     map.putDouble("frameWidth", snapshot.frameWidth)
     map.putDouble("frameHeight", snapshot.frameHeight)
     map.putDouble("contentRegionInset", snapshot.contentRegionInset)

@@ -160,6 +160,11 @@
   [_impl setSurfaceShadows:shadows];
 }
 
+- (CGFloat)currentCardLeft
+{
+  return _impl.currentCardLeft;
+}
+
 - (CGFloat)currentContentOffsetX
 {
   return _impl.currentContentOffsetX;
@@ -173,6 +178,11 @@
 - (CGFloat)currentContentScale
 {
   return _impl.currentContentScale;
+}
+
+- (CGFloat)currentCardHeightForBottomAnchor
+{
+  return _impl.currentCardHeightForBottomAnchor;
 }
 
 - (BOOL)isModalAccessibilityActive

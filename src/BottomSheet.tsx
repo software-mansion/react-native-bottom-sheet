@@ -13,7 +13,7 @@ import type {
   StyleProp,
   ViewStyle,
 } from 'react-native';
-import { StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import {
   BottomSheetContentWrapperView,
@@ -30,11 +30,13 @@ import {
   type SheetPlacement,
 } from './cardPlacement';
 import {
+  BOTTOM_ANCHORED_CONTENT_NATIVE_ID,
   CONTENT_HEIGHT_MARKER_NATIVE_ID,
   type Detent,
   isNormalizedDetentClosed,
   type ModalDetent,
   normalizeDetents,
+  resolveBottomAnchoredContent,
   resolveSurfaceStyle,
   type SurfaceStyle,
   validateIndex,
@@ -97,6 +99,15 @@ const DEFAULT_SCROLL_COORDINATION = {
 export interface BottomSheetProps {
   /** Sheet contents, including any scrollable content. */
   children: ReactNode;
+  /**
+   * Native content pinned to the bottom edge of the visible card. It is laid
+   * out at the largest detent's size and clipped by the card at shorter
+   * detents. It sits above the surface and behind the regular children.
+   * Regular children alone determine the height of a `'content'` detent.
+   */
+  bottomAnchoredContent?: ReactNode;
+  /** @deprecated Use `bottomAnchoredContent`. */
+  iosBottomAnchoredContent?: ReactNode;
   /**
    * The fill of the sheet's surface: an optional element, typically a
    * background View, rendered behind the content. The library sizes and
@@ -312,6 +323,8 @@ let lastOpenOrder = 0;
 export const BottomSheet = (props: BottomSheetProps) => {
   const {
     children,
+    bottomAnchoredContent,
+    iosBottomAnchoredContent,
     surface,
     surfaceStyle,
     style,
@@ -341,6 +354,12 @@ export const BottomSheet = (props: BottomSheetProps) => {
   const resolvedCollapseCoordination =
     typeof coordination === 'string' ? coordination : coordination.collapse;
   const usesWindowOverlay = modal && windowOverlay;
+  const anchoredContent = resolveBottomAnchoredContent(
+    Platform.OS,
+    bottomAnchoredContent,
+    iosBottomAnchoredContent
+  );
+  const hasBottomAnchoredContent = anchoredContent != null;
   // All real geometry — the sheet's frame, the content wrapper's bounds, and
   // the default top inset (the overlapping status-bar inset) — is measured
   // natively from the window the sheet actually lives in and flows into the
@@ -394,6 +413,11 @@ export const BottomSheet = (props: BottomSheetProps) => {
     resolvedMaxWidth > 0
       ? Math.max(0, resolvedMaxWidth - contentLeft - contentRight)
       : undefined;
+  const absoluteCardChildStyle = {
+    start: isRTL ? contentRight : contentLeft,
+    end: isRTL ? contentLeft : contentRight,
+    maxWidth: contentMaxWidth,
+  };
   // When the sheet last opened, relative to other sheets: 0 until it first
   // opens. This includes reopening while it is still closing.
   const [wasSheetClosed, setWasSheetClosed] = useState(isSheetClosed);
@@ -544,20 +568,24 @@ export const BottomSheet = (props: BottomSheetProps) => {
             <BottomSheetSurfaceView
               collapsable={false}
               pointerEvents="box-none"
-              style={[
-                styles.surface,
-                {
-                  start: isRTL ? contentRight : contentLeft,
-                  end: isRTL ? contentLeft : contentRight,
-                  maxWidth: contentMaxWidth,
-                },
-              ]}
+              style={[styles.absoluteCardChild, absoluteCardChildStyle]}
             >
               {surface}
             </BottomSheetSurfaceView>
           )}
+          {hasBottomAnchoredContent && (
+            <BottomSheetContentWrapperView
+              collapsable={false}
+              nativeID={BOTTOM_ANCHORED_CONTENT_NATIVE_ID}
+              pointerEvents="box-none"
+              style={[styles.absoluteCardChild, absoluteCardChildStyle]}
+            >
+              {anchoredContent}
+            </BottomSheetContentWrapperView>
+          )}
           <BottomSheetContentWrapperView
             collapsable={false}
+            pointerEvents={hasBottomAnchoredContent ? 'box-none' : undefined}
             // The wrapper fills the sheet's content region exactly: the native
             // side reports the region's inset (the gap between the sheet's
             // height and the tallest detent, clamped to the space its insets leave) into
@@ -602,6 +630,6 @@ export const BottomSheet = (props: BottomSheetProps) => {
 };
 
 const styles = StyleSheet.create({
-  surface: { position: 'absolute', top: 0, bottom: 0 },
+  absoluteCardChild: { position: 'absolute', top: 0, bottom: 0 },
   contentWrapper: { flex: 1 },
 });

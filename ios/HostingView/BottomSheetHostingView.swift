@@ -138,6 +138,16 @@ public final class BottomSheetHostingView: UIView {
 
   public let sheetContainer = UIView()
   let clipContainer = CardClipView()
+  weak var bottomAnchoredContentView: UIView?
+  var bottomAnchorTopInsets: [CGFloat] = []
+  let bottomAnchorViewport = UIView()
+
+  var cardContentViews: [UIView] {
+    let children = clipContainer.subviews
+    guard let anchored = bottomAnchoredContentView else { return children }
+    return children.map { $0 === bottomAnchorViewport ? anchored : $0 }
+  }
+
   /// Casts the card's shadows. A sibling below the clipping container, so the
   /// clip never cuts the shadows.
   let shadowView = UIView()
@@ -188,6 +198,7 @@ public final class BottomSheetHostingView: UIView {
   // content wrapper. Mirrored in `bottomSheetUtils.ts` and `BottomSheetHostView.kt`;
   // keep the three in sync.
   static let contentHeightMarkerNativeID = "swm-bottom-sheet-content-height-marker"
+  static let bottomAnchoredContentNativeID = "swm-bottom-sheet-bottom-anchored-content"
   var contentHeightMarker: UIView?
   weak var surfaceView: UIView?
   static var markerObservationContext = 0
@@ -217,6 +228,9 @@ public final class BottomSheetHostingView: UIView {
   static let cardContentAnimationKey = "bottomSheetCardContent"
   /// The settle animation the card is following, kept so the content's keyframes
   /// can be rebuilt when a layout moves the content mid-settle.
+  var animatedWidth: CGFloat = 0
+  var animatedBias: CGFloat = 0
+  var animatedMaxWidth: CGFloat = 0
   var cardSettleAnimation: CAKeyframeAnimation?
   /// The centers and sizes that the running content keyframes were built from.
   var contentAnimationLayouts: [CGRect] = []
@@ -358,11 +372,13 @@ public final class BottomSheetHostingView: UIView {
     // presented geometry and the model already holds the target.
     applyCardGeometry(forPosition: maxHeight - sheetContainer.transform.ty)
 
+    refreshCardAnimations()
+
     // Report fresh native geometry so the component layer can push the content
     // wrapper's target size (and the overlay frame) into the shadow tree.
     eventDelegate?.bottomSheetHostingViewDidLayout(self)
 
-    if !hasLaidOut && !detentSpecs.isEmpty {
+    if !hasLaidOut, !detentSpecs.isEmpty {
       let indexToApply = pendingIndex ?? targetIndex
       let clampedIndex = max(0, min(detentSpecs.count - 1, indexToApply))
 
@@ -398,11 +414,15 @@ public final class BottomSheetHostingView: UIView {
     updateScrim()
   }
 
-  /// The card as it is drawn, in host coordinates. Mid-settle the translation
-  /// comes from the spring instead of the presentation layer, which lags one
-  /// commit behind right after a snap starts. The container's transform is
-  /// translation-only.
+  /// Use the rendered clip when available. Before Core Animation publishes
+  /// its first presentation tree, reconstruct it from the settle clock.
   var presentedCardFrame: CGRect {
+    if bottomAnchoredContentView != nil, activeSpring != nil, clipContainer.layer.animation(forKey: Self.cardBoundsAnimationKey) != nil,
+       let clip = clipContainer.layer.presentation(),
+       let host = layer.presentation()
+    {
+      return clip.convert(clip.bounds, to: host)
+    }
     let ty = currentTranslationY
     let size = sheetContainer.bounds.size
     let center = sheetContainer.center
@@ -439,9 +459,53 @@ public final class BottomSheetHostingView: UIView {
       return scrimView.hitTest(scrimPoint, with: event)
     }
 
+    if bottomAnchoredContentView != nil, activeSpring != nil {
+      return presentedTarget(at: point, event: event)
+    }
     let containerPoint = convert(point, to: sheetContainer)
     guard sheetContainer.bounds.contains(containerPoint) else { return nil }
     return sheetContainer.hitTest(containerPoint, with: event)
+  }
+
+  func presentedTarget(at point: CGPoint, event: UIEvent?) -> UIView? {
+    let ty = currentTranslationY
+    let card = cardRect(forPosition: sheetContainerHeight - ty)
+    let local = CGPoint(x: point.x - sheetContainer.center.x + sheetContainer.bounds.midX,
+                        y: point.y - sheetContainer.center.y + sheetContainer.bounds.midY - ty)
+    guard presentedCardContains(point) else { return nil }
+    let disabled = isContentInteractionDisabled
+    if disabled {
+      setContentInteractionEnabled(true)
+    }
+    defer {
+      if disabled {
+        setContentInteractionEnabled(false)
+      }
+    }
+    for child in cardContentViews.reversed() {
+      if let host = layer.presentation(), let rendered = child.layer.presentation() {
+        if child === bottomAnchoredContentView, let viewport = bottomAnchorViewport.layer.presentation(),
+           !viewport.bounds.contains(viewport.convert(point, from: host))
+        {
+          continue
+        }
+        if let hit = child.hitTest(rendered.convert(point, from: host), with: event) {
+          return hit
+        }
+        continue
+      }
+      if child === bottomAnchoredContentView,
+         !bottomAnchorBounds(in: card, position: sheetContainerHeight - ty).contains(local)
+      {
+        continue
+      }
+      let transform = childToSheet(child, card: card)
+      guard transform.a > 0 else { continue }
+      if let hit = child.hitTest(local.applying(transform.inverted()), with: event) {
+        return hit
+      }
+    }
+    return sheetContainer
   }
 
   public func setDetents(_ raw: [NSDictionary]) {
@@ -503,7 +567,22 @@ public final class BottomSheetHostingView: UIView {
     if hasLaidOut, rawDetentSpecs.last != previousTallestDetent || widestCardChanged {
       isContentRegionChangePending = true
     }
+    let anchorInsets = entries.map {
+      CGFloat(truncating: $0["contentClipTopInset"] as? NSNumber ?? 0)
+    }
+    let resolvedAnchorInsets = anchorInsets.contains { $0 > 0 } ? anchorInsets : []
+    let anchorInsetsChanged = bottomAnchorTopInsets != resolvedAnchorInsets
+    bottomAnchorTopInsets = resolvedAnchorInsets
     refreshDetentsFromLayout()
+    if bottomAnchoredContentView != nil, anchorInsetsChanged {
+      applyCardGeometry(forPosition: sheetContainerHeight - sheetContainer.transform.ty)
+      refitScrollIndicators()
+      if let cardSettleAnimation {
+        addCardAnimations(matching: cardSettleAnimation)
+      }
+    } else {
+      refreshCardAnimations()
+    }
     // Set once the detents are re-resolved, so the scrim isn’t repainted
     // against the previous ones.
     scrimOpacities = entries.map { CGFloat(truncating: $0["scrimOpacity"] as? NSNumber ?? 1) }
@@ -599,12 +678,31 @@ public final class BottomSheetHostingView: UIView {
   }
 
   public func mountChildComponentView(_ childView: UIView, atIndex index: Int) {
-    clipContainer.insertSubview(childView, at: index)
+    if nativeID(of: childView) == Self.bottomAnchoredContentNativeID {
+      bottomAnchoredContentView = childView
+      bottomAnchorViewport.clipsToBounds = true
+      bottomAnchorViewport.layer.anchorPoint = .zero
+      bottomAnchorViewport.addSubview(childView)
+      clipContainer.insertSubview(bottomAnchorViewport, at: index)
+      clipContainer.clipsToBounds = true
+      applyCardGeometry(forPosition: sheetContainerHeight - sheetContainer.transform.ty)
+      if let cardSettleAnimation {
+        addCardAnimations(matching: cardSettleAnimation)
+      }
+    } else {
+      clipContainer.insertSubview(childView, at: index)
+    }
     refreshContentHeightMarker()
     setNeedsLayout()
   }
 
   public func unmountChildComponentView(_ childView: UIView) {
+    if bottomAnchoredContentView === childView {
+      bottomAnchoredContentView = nil
+      bottomAnchorViewport.layer.removeAllAnimations()
+      bottomAnchorViewport.removeFromSuperview()
+      clipContainer.clipsToBounds = isCardShaped
+    }
     // Fabric recycles the view, which must not keep the card's scale.
     childView.layer.removeAnimation(forKey: Self.cardContentAnimationKey)
     childView.layer.transform = CATransform3DIdentity
@@ -665,6 +763,12 @@ public final class BottomSheetHostingView: UIView {
     committedContentRegionInset = .nan
     appliedContentRegionInset = .nan
     surfaceView = nil
+    bottomAnchoredContentView?.layer.transform = CATransform3DIdentity
+    bottomAnchoredContentView?.removeFromSuperview()
+    bottomAnchoredContentView = nil
+    bottomAnchorViewport.removeFromSuperview()
+    bottomAnchorTopInsets = []
+    clipContainer.clipsToBounds = isCardShaped
     sheetContainer.transform = .identity
     scrimView.alpha = 0
     scrimView.isHidden = true

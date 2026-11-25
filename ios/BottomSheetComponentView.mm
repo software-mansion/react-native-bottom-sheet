@@ -56,9 +56,11 @@ using namespace facebook::react;
 @implementation BottomSheetComponentView {
   BottomSheetContentView *_sheetView;
   State::Shared _sheetState;
+  float _lastCardLeft;
   float _lastContentOffsetX;
   float _lastContentOffsetY;
   float _lastContentScale;
+  float _lastCardHeightForBottomAnchor;
   BOOL _needsIndexSyncAfterRecycle;
   BOOL _windowOverlay;
   NSInteger _openOrder;
@@ -115,6 +117,7 @@ using namespace facebook::react;
         @"maxWidth": @(detent.maxWidth),
         @"placementBias": @(detent.placementBias),
         @"scrimOpacity": @(detent.scrimOpacity),
+        @"contentClipTopInset": @(detent.contentClipTopInset),
       }];
     }
     [_sheetView setDetents:detentsArray];
@@ -426,9 +429,11 @@ using namespace facebook::react;
   }
   updateBottomSheetState(
       _sheetState,
+      _lastCardLeft,
       _lastContentOffsetX,
       _lastContentOffsetY,
       _lastContentScale,
+      _lastCardHeightForBottomAnchor,
       {static_cast<Float>(_lastGeometryFrameSize.width),
        static_cast<Float>(_lastGeometryFrameSize.height)},
       isnan(_lastGeometryInset) ? 0 : static_cast<Float>(_lastGeometryInset),
@@ -539,16 +544,20 @@ using namespace facebook::react;
 /// remains to be applied here.
 - (void)pushContentGeometry
 {
+  float cardLeft = static_cast<float>(_sheetView.currentCardLeft);
   float contentOffsetX = static_cast<float>(_sheetView.currentContentOffsetX);
   float contentOffsetY = static_cast<float>(_sheetView.currentContentOffsetY);
   float contentScale = static_cast<float>(_sheetView.currentContentScale);
-  if (contentOffsetX == _lastContentOffsetX && contentOffsetY == _lastContentOffsetY
-      && contentScale == _lastContentScale) {
+  float cardHeight = static_cast<float>(_sheetView.currentCardHeightForBottomAnchor);
+  if (cardLeft == _lastCardLeft && contentOffsetX == _lastContentOffsetX && contentOffsetY == _lastContentOffsetY
+      && contentScale == _lastContentScale && cardHeight == _lastCardHeightForBottomAnchor) {
     return;
   }
+  _lastCardLeft = cardLeft;
   _lastContentOffsetX = contentOffsetX;
   _lastContentOffsetY = contentOffsetY;
   _lastContentScale = contentScale;
+  _lastCardHeightForBottomAnchor = cardHeight;
   [self pushStateSnapshot];
 }
 
@@ -580,9 +589,11 @@ using namespace facebook::react;
   _needsIndexSyncAfterRecycle = YES;
   [_sheetView resetSheetState];
   _sheetState.reset();
+  _lastCardLeft = 0;
   _lastContentOffsetX = 0;
   _lastContentOffsetY = 0;
   _lastContentScale = 1;
+  _lastCardHeightForBottomAnchor = 0;
   _lastGeometryFrameSize = CGSizeZero;
   _lastGeometryInset = NAN;
   _lastGeometrySurfaceOverflow = 0;

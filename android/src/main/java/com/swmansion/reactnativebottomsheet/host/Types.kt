@@ -53,6 +53,8 @@ internal data class StateSnapshot(
   val contentOffsetX: Double,
   val contentOffsetY: Double,
   val contentScale: Double,
+  val cardLeft: Double,
+  val cardHeight: Double,
   val frameWidth: Double,
   val frameHeight: Double,
   val contentRegionInset: Double,

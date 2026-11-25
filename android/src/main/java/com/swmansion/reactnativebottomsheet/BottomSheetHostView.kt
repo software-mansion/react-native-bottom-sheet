@@ -8,6 +8,7 @@ import android.view.ViewGroup
 import android.view.WindowInsets
 import androidx.core.view.NestedScrollingParent3
 import androidx.core.view.ViewCompat
+import com.facebook.react.R
 import com.facebook.react.uimanager.PointerEvents
 import com.facebook.react.uimanager.StateWrapper
 import com.facebook.react.views.view.ReactViewGroup
@@ -133,6 +134,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
   private val detents: Detents =
     Detents(
       state,
+      card,
       clipContainer,
       scrim,
       contentRegion,
@@ -199,15 +201,26 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
   val sheetChildCount: Int
     get() = clipContainer.childCount
 
-  fun getSheetChildAt(index: Int): View? = clipContainer.getChildAt(index)
+  fun getSheetChildAt(index: Int): View? {
+    val child = clipContainer.getChildAt(index)
+    return if (child is BottomSheetAnchorClipLayout) child.content else child
+  }
 
   fun addSheetChild(child: View, index: Int) {
-    clipContainer.addView(child, index)
+    val hostChild =
+      if (child.getTag(R.id.view_tag_native_id) == BOTTOM_ANCHORED_CONTENT_NATIVE_ID) {
+        BottomSheetAnchorClipLayout(child)
+      } else {
+        child
+      }
+    clipContainer.addView(hostChild, index)
     detents.refreshContentHeightMarker()
   }
 
   fun removeSheetChildAt(index: Int) {
-    clipContainer.getChildAt(index)?.let(card::resetContentTransform)
+    getSheetChildAt(index)?.let(card::resetContentTransform)
+    val child = clipContainer.getChildAt(index)
+    if (child is BottomSheetAnchorClipLayout) child.removeView(child.content)
     clipContainer.removeViewAt(index)
     detents.refreshContentHeightMarker()
   }
@@ -218,7 +231,8 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
     if (child === sheetContainer || child === cardTouchSensor || child === scrimDismissView) {
       super.addView(child, index, params)
     } else {
-      clipContainer.addView(child, index, params)
+      child.layoutParams = params
+      addSheetChild(child, index)
     }
   }
 
@@ -226,16 +240,13 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
     if (view === sheetContainer) {
       super.removeView(view)
     } else {
-      card.resetContentTransform(view)
-      clipContainer.removeView(view)
-      detents.refreshContentHeightMarker()
+      val index = clipContainer.indexOfChild((view.parent as? BottomSheetAnchorClipLayout) ?: view)
+      if (index >= 0) removeSheetChildAt(index)
     }
   }
 
   override fun removeViewAt(index: Int) {
-    clipContainer.getChildAt(index)?.let(card::resetContentTransform)
-    clipContainer.removeViewAt(index)
-    detents.refreshContentHeightMarker()
+    removeSheetChildAt(index)
   }
 
   // MARK: - Layout
@@ -644,10 +655,9 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
     scrim.clearScrimProgress()
     state.suppressScrimForClosingTarget = false
     state.scrimPinnedFull = false
-    for (i in 0 until clipContainer.childCount) {
-      card.resetContentTransform(clipContainer.getChildAt(i))
+    for (i in clipContainer.childCount - 1 downTo 0) {
+      removeSheetChildAt(i)
     }
-    clipContainer.removeAllViews()
     stateWrapper = null
     contentRegion.clearShadowOffset()
     card.clearShadowContentTransform()
@@ -688,6 +698,8 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
   }
 
   companion object {
+    internal const val BOTTOM_ANCHORED_CONTENT_NATIVE_ID =
+      "swm-bottom-sheet-bottom-anchored-content"
     // The `nativeID` the JS side gives the zero-height marker it appends to
     // the content wrapper. Mirrored in `bottomSheetUtils.ts` and
     // `BottomSheetHostingView.swift`; keep the three in sync.

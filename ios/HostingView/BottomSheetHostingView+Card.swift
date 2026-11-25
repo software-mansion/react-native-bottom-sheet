@@ -106,6 +106,16 @@ extension BottomSheetHostingView {
     return contentScale(forCardWidth: cardRect(forPosition: currentSheetHeight).width)
   }
 
+  public var currentCardHeightForBottomAnchor: CGFloat {
+    guard bottomAnchoredContentView != nil else { return 0 }
+    return cardRect(forPosition: currentSheetHeight).height
+  }
+
+  public var currentCardLeft: CGFloat {
+    guard bottomAnchoredContentView != nil else { return 0 }
+    return cardRect(forPosition: currentSheetHeight).minX
+  }
+
   /// The sheet coordinate space's horizontal displacement, which the scale applies
   /// to as well: it puts the widest card's left edge, scaled, on the card's.
   public var currentContentOffsetX: CGFloat {
@@ -234,22 +244,64 @@ extension BottomSheetHostingView {
       layer.shadowPath = cardPath(in: rect, outset: shadow.spreadDistance)
       (layer.mask as? CAShapeLayer)?.path = shadowMaskPath(in: rect, for: shadow)
     }
-    for view in clipContainer.subviews {
+    if bottomAnchoredContentView != nil {
+      let anchor = bottomAnchorBounds(in: rect, position: position)
+      bottomAnchorViewport.layer.bounds = anchor
+      bottomAnchorViewport.layer.position = anchor.origin
+    }
+    for view in cardContentViews {
       view.layer.transform = contentTransform(of: view, in: rect)
     }
     CATransaction.commit()
   }
 
-  /// Scales a view (the surface or content) to the card's width and pins its
-  /// top-left corner to the card's. Layer work only: the view keeps its layout.
+  func bottomAnchorBounds(in card: CGRect, position: CGFloat) -> CGRect {
+    let position = max(position, firstOpenDetentPosition)
+    let topInset = bottomAnchorInset(at: position) * contentScale(forCardWidth: card.width)
+    let top = min(topInset, card.height)
+    return CGRect(x: card.minX, y: card.minY + top, width: card.width, height: card.height - top)
+  }
+
+  private func bottomAnchorInset(at position: CGFloat) -> CGFloat {
+    guard bottomAnchorTopInsets.count == detentSpecs.count,
+          let last = bottomAnchorTopInsets.last else { return 0 }
+    guard let next = detentSpecs.firstIndex(where: { position < $0.position }) else { return last }
+    var end = next
+    while end + 1 < detentSpecs.count, detentSpecs[end + 1].position == detentSpecs[next].position {
+      end += 1
+    }
+    guard next > 0 else { return bottomAnchorTopInsets[end] }
+    let lower = detentSpecs[next - 1].position
+    let upper = detentSpecs[next].position
+    let fraction = (position - lower) / (upper - lower)
+    let start = bottomAnchorTopInsets[next - 1]
+    return start + (bottomAnchorTopInsets[end] - start) * fraction
+  }
+
+  func childToSheet(_ child: UIView, card: CGRect) -> CGAffineTransform {
+    let transform = contentTransform(of: child, in: card)
+    let bounds = child.bounds
+    return CGAffineTransform(
+      a: transform.m11, b: 0, c: 0, d: transform.m22,
+      tx: child.center.x + transform.m41 - transform.m11 * bounds.midX,
+      ty: child.center.y + transform.m42 - transform.m22 * bounds.midY
+    )
+  }
+
+  /// Fits a child to the card's width and pins it to its chosen vertical edge.
   private func contentTransform(of contentView: UIView, in rect: CGRect) -> CATransform3D {
-    guard hasCardGaps else { return CATransform3DIdentity }
-    let scale = contentScale(forCardWidth: rect.width)
+    let anchorsToBottom = contentView === bottomAnchoredContentView
+    guard hasCardGaps || anchorsToBottom else { return CATransform3DIdentity }
+    let scale = hasCardGaps ? contentScale(forCardWidth: rect.width) : 1
     // The layer scales about its center, which Fabric's layout owns.
     let center = contentView.center
     let size = contentView.bounds.size
     let dx = rect.minX - (center.x - scale * size.width / 2)
-    let dy = rect.minY - (center.y - scale * size.height / 2)
+    let dy = anchorsToBottom
+      ? bottomAnchorTranslation(
+        cardBottom: rect.maxY, centerY: center.y, height: size.height, scale: scale
+      )
+      : rect.minY - (center.y - scale * size.height / 2)
     return CATransform3DConcat(
       CATransform3DMakeScale(scale, scale, 1),
       CATransform3DMakeTranslation(dx, dy, 0)
@@ -305,7 +357,7 @@ extension BottomSheetHostingView {
   /// fall back to a mask drawn from `cardPath`, in the same curve.
   func updateCardShape() {
     let rounded = cornerRadii.filter { $0 > 0 }
-    clipContainer.clipsToBounds = isCardShaped
+    clipContainer.clipsToBounds = isCardShaped || bottomAnchoredContentView != nil
     if let radius = rounded.first, rounded.allSatisfy({ abs($0 - radius) < 0.01 }) {
       var corners: CACornerMask = []
       if cornerRadii[0] > 0 {
@@ -346,9 +398,12 @@ extension BottomSheetHostingView {
   /// sheet's settle animation, so the card's height follows the sheet frame
   /// for frame on the render server.
   func addCardAnimations(matching sheetAnimation: CAKeyframeAnimation) {
-    // An unclipped card without shadows draws nothing that follows its
-    // geometry; the model geometry is enough.
-    guard isCardShaped || !cardShadows.isEmpty else { return }
+    animatedWidth = sheetContainer.bounds.width
+    animatedBias = cardPlacementBias
+    animatedMaxWidth = cardMaxWidth
+    cardSettleAnimation = sheetAnimation
+    // A plain card only needs keyframes when something follows its edge.
+    guard isCardShaped || !cardShadows.isEmpty || bottomAnchoredContentView != nil else { return }
     let samples = (sheetAnimation.values ?? []).compactMap {
       ($0 as? CGFloat) ?? ($0 as? NSNumber).map { CGFloat(truncating: $0) }
     }
@@ -366,7 +421,19 @@ extension BottomSheetHostingView {
       keyframes("position", rects.map { NSValue(cgPoint: $0.origin) }),
       forKey: Self.cardPositionAnimationKey
     )
-    cardSettleAnimation = sheetAnimation
+    if bottomAnchoredContentView != nil {
+      let anchors = zip(rects, samples).map {
+        bottomAnchorBounds(in: $0.0, position: sheetContainerHeight - $0.1)
+      }
+      bottomAnchorViewport.layer.add(
+        keyframes("bounds", anchors.map { NSValue(cgRect: $0) }),
+        forKey: Self.cardBoundsAnimationKey
+      )
+      bottomAnchorViewport.layer.add(
+        keyframes("position", anchors.map { NSValue(cgPoint: $0.origin) }),
+        forKey: Self.cardPositionAnimationKey
+      )
+    }
     addContentAnimation()
     cardMask?.add(
       keyframes("path", rects.map { cardPath(in: $0) }),
@@ -388,13 +455,16 @@ extension BottomSheetHostingView {
   /// replaces them: the same `beginTime` keeps them on the settle's clock, so
   /// nothing visibly restarts.
   func addContentAnimation() {
-    guard hasCardGaps, let sheetAnimation = cardSettleAnimation else { return }
+    guard
+      hasCardGaps || bottomAnchoredContentView != nil,
+      let sheetAnimation = cardSettleAnimation
+    else { return }
     let samples = (sheetAnimation.values ?? []).compactMap {
       ($0 as? CGFloat) ?? ($0 as? NSNumber).map { CGFloat(truncating: $0) }
     }
     let rects = cardRects(forSamples: samples)
     contentAnimationLayouts = currentContentLayouts
-    for view in clipContainer.subviews {
+    for view in cardContentViews where hasCardGaps || view === bottomAnchoredContentView {
       view.layer.add(
         Self.cardKeyframes(
           "transform",
@@ -406,13 +476,26 @@ extension BottomSheetHostingView {
     }
   }
 
-  var isContentAnimationStale: Bool {
-    guard cardSettleAnimation != nil else { return false }
+  func refreshCardAnimations() {
+    guard let animation = cardSettleAnimation else { return }
+    if animatedWidth != sheetContainer.bounds.width || animatedBias != cardPlacementBias
+      || animatedMaxWidth != cardMaxWidth || isContentAnimationStale
+    {
+      removeCardAnimations()
+      addCardAnimations(matching: animation)
+    }
+  }
+
+  private var isContentAnimationStale: Bool {
+    guard
+      hasCardGaps || bottomAnchoredContentView != nil,
+      cardSettleAnimation != nil
+    else { return false }
     return contentAnimationLayouts != currentContentLayouts
   }
 
   private var currentContentLayouts: [CGRect] {
-    clipContainer.subviews.map { CGRect(origin: $0.center, size: $0.bounds.size) }
+    cardContentViews.map { CGRect(origin: $0.center, size: $0.bounds.size) }
   }
 
   private func cardRects(forSamples samples: [CGFloat]) -> [CGRect] {
@@ -440,9 +523,15 @@ extension BottomSheetHostingView {
     cardSettleAnimation = nil
     contentAnimationLayouts = []
     sheetContainer.layer.removeAnimation(forKey: Self.springAnimationKey)
+    removeCardAnimations()
+  }
+
+  private func removeCardAnimations() {
     clipContainer.layer.removeAnimation(forKey: Self.cardBoundsAnimationKey)
     clipContainer.layer.removeAnimation(forKey: Self.cardPositionAnimationKey)
-    clipContainer.subviews.forEach { $0.layer.removeAnimation(forKey: Self.cardContentAnimationKey) }
+    bottomAnchorViewport.layer.removeAnimation(forKey: Self.cardBoundsAnimationKey)
+    bottomAnchorViewport.layer.removeAnimation(forKey: Self.cardPositionAnimationKey)
+    cardContentViews.forEach { $0.layer.removeAnimation(forKey: Self.cardContentAnimationKey) }
     cardMask?.removeAnimation(forKey: Self.cardMaskAnimationKey)
     for layer in shadowLayers {
       layer.removeAnimation(forKey: Self.cardShadowAnimationKey)

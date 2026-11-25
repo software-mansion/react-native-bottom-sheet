@@ -4,7 +4,6 @@ import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.uimanager.ThemedReactContext
 import com.facebook.react.uimanager.ViewGroupManager
 import com.facebook.react.uimanager.ViewManagerDelegate
-import com.facebook.react.viewmanagers.BottomSheetContentWrapperViewManagerDelegate
 import com.facebook.react.viewmanagers.BottomSheetContentWrapperViewManagerInterface
 import com.facebook.react.views.view.ReactViewGroup
 
@@ -22,7 +21,7 @@ class BottomSheetContentWrapperViewManager :
     const val NAME = "BottomSheetContentWrapperView"
   }
 
-  private val delegate = BottomSheetContentWrapperViewManagerDelegate(this)
+  private val delegate = BottomSheetContentPointerEventsDelegate(this)
 
   override fun getDelegate(): ViewManagerDelegate<ReactViewGroup> = delegate
 

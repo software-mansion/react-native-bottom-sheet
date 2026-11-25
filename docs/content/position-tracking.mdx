@@ -108,3 +108,45 @@ library depending on Reanimated. Pass a stable function (such as
 Inside the worklet, Reanimated unwraps the native event, so you read
 `event.position` directly rather than `event.nativeEvent.position`. The handler
 runs on the UI thread on every frame the sheet moves.
+
+## Pinning content to the bottom
+
+On iOS and Android, use `bottomAnchoredContent` on `BottomSheet` or `ModalBottomSheet` for a view
+that should stay at the card's bottom edge during a drag and during the settle
+animation. The slot is laid out against the largest detent. Shorter detents clip
+it, so a list inside keeps the same viewport size during motion. The sheet lays
+out its regular children above the slot in the drawing order and uses those
+children to measure a `'content'` detent.
+
+### Setting the top edge of the visible content
+
+Set `contentClipTopInset` on an open detent to move the top edge of the
+visible and interactive area of `bottomAnchoredContent` down from the card's top.
+The slot keeps its layout size and its bottom anchor. The native host
+interpolates the boundary between detents in step with the card animation.
+The default is zero. When detents resolve to the same height, the last one
+at that height supplies the inset in both directions.
+
+Use this when another part of the sheet occupies the same area as content
+whose layout needs to remain stable. An opaque overlay covers the content
+and replaces any translucency or blur in that area with a solid fill. The
+clip defines a shared boundary for drawing and touch input independently
+of the surface material.
+
+```tsx
+<BottomSheet
+  detents={[
+    0,
+    { value: '50%', contentClipTopInset: 48 },
+    { value: '100%', contentClipTopInset: 64 },
+  ]}
+  index={index}
+  onIndexChange={setIndex}
+  bottomAnchoredContent={<Conversation />}
+>
+  <Header />
+</BottomSheet>
+```
+
+The iOS-only alias `iosBottomAnchoredContent` is used when
+`bottomAnchoredContent` is null or undefined. On the web, render the composer in the regular children.
