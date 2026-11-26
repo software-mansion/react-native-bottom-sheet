@@ -644,6 +644,7 @@ class BottomSheetHostView(context: Context) : ReactViewGroup(context), NestedScr
     scrim.clearScrimProgress()
     state.suppressScrimForClosingTarget = false
     state.scrimPinnedFull = false
+    state.scrimOpacityFloor = 0f
     for (i in 0 until clipContainer.childCount) {
       card.resetContentTransform(clipContainer.getChildAt(i))
     }

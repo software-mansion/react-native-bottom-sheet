@@ -57,7 +57,9 @@ internal class Scrim(private val state: SheetState) {
       return
     }
 
-    scrimProgress = scrimOpacityAt(position)
+    val targetOpacity =
+      state.detentSpecs.getOrNull(state.targetIndex)?.let { scrimOpacityAt(it.position) } ?: 0f
+    scrimProgress = maxOf(scrimOpacityAt(position), minOf(state.scrimOpacityFloor, targetOpacity))
     state.hostView.invalidate()
   }
 
@@ -71,11 +73,11 @@ internal class Scrim(private val state: SheetState) {
    * Interpolates the scrim opacity for a sheet height by bracketing it between adjacent detent
    * heights and lerping each detent index's configured value.
    */
-  private fun scrimOpacityAt(position: Float): Float =
+  fun scrimOpacityAt(position: Float, opacities: List<Float> = scrimOpacities): Float =
     state.interpolateAtPosition(
       position,
       state.detentSpecs.indices.map {
-        (scrimOpacities.getOrNull(it) ?: 1f).coerceIn(0f, 1f)
+        (opacities.getOrNull(it) ?: 1f).coerceIn(0f, 1f)
       },
     )
 

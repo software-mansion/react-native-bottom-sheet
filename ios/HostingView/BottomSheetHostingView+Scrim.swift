@@ -126,7 +126,10 @@ extension BottomSheetHostingView {
       return
     }
 
-    let progress = scrimOpacity(forPosition: position)
+    let targetOpacity = detentSpecs.indices.contains(targetIndex)
+      ? scrimOpacity(forPosition: detentSpecs[targetIndex].position)
+      : 0
+    let progress = max(scrimOpacity(forPosition: position), min(scrimOpacityFloor, targetOpacity))
     scrimView.alpha = progress
     scrimView.isHidden = progress <= 0.001
   }

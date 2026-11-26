@@ -19,7 +19,7 @@ import {
 } from './detents';
 import { clamp, readSafeAreaTop } from './dom';
 import { SheetGestures } from './gestures';
-import { applyScrim, detentIndex } from './scrim';
+import { applyScrim, detentIndex, scrimOpacity } from './scrim';
 import { ScrollMomentum } from './scrollCoordination';
 import { SheetSnapping } from './snapping';
 import type {
@@ -68,6 +68,7 @@ export class BottomSheetWebController {
   lastReportedError: string | null = null;
 
   scrimPinnedFull = false;
+  scrimOpacityFloor = 0;
   isPanning = false;
 
   private frameRequest: number | null = null;
@@ -201,7 +202,7 @@ export class BottomSheetWebController {
     if (indexChanged && !wasLaidOut) {
       this.setDetentIndex(config.index);
     }
-    this.layout();
+    this.layout(previous?.detents);
     if (indexChanged && wasLaidOut) {
       this.setDetentIndex(config.index);
     }
@@ -305,7 +306,7 @@ export class BottomSheetWebController {
     return this.config!;
   }
 
-  private layout() {
+  private layout(previousRawDetents?: ReadonlyArray<RawDetent>) {
     this.needsLayout = false;
     const elements = this.elements;
     if (elements === null || this.config === null) return;
@@ -330,7 +331,7 @@ export class BottomSheetWebController {
         : this.widestCardInsets.insetLeft;
     this.card.updateCardClip();
 
-    this.resolveDetentsFromLayout();
+    this.resolveDetentsFromLayout(previousRawDetents);
     this.replayPendingIndexIfResolved();
     this.updateSurfaceOverflow();
     this.lastAppliedHostHeight = hostHeight;
@@ -373,7 +374,9 @@ export class BottomSheetWebController {
     this.updateScrim();
   }
 
-  private resolveDetentsFromLayout() {
+  private resolveDetentsFromLayout(
+    previousRawDetents: ReadonlyArray<RawDetent> = this.requireConfig().detents
+  ) {
     if (
       this.hasLaidOut &&
       isInvalidContentDetentTarget(this, this.targetIndex)
@@ -398,14 +401,27 @@ export class BottomSheetWebController {
     const previousHostHeight = Number.isFinite(this.lastAppliedHostHeight)
       ? this.lastAppliedHostHeight
       : hostHeight;
+    const previousVisibleHeight =
+      previousHostHeight - this.snapping.currentTranslateY();
     const firstOpen = firstOpenPosition(this.detents);
     const wasScrimFull =
       this.hasLaidOut &&
       !this.isPanning &&
       this.requireConfig().modal &&
       firstOpen > 0 &&
-      previousHostHeight - this.snapping.currentTranslateY() + 0.5 >= firstOpen;
+      previousVisibleHeight + 0.5 >= firstOpen;
     this.scrimPinnedFull = this.scrimPinnedFull || wasScrimFull;
+    if (
+      this.hasLaidOut &&
+      !this.isPanning &&
+      this.requireConfig().modal &&
+      !this.scrimPinnedFull
+    ) {
+      this.scrimOpacityFloor = Math.max(
+        this.scrimOpacityFloor,
+        scrimOpacity(previousVisibleHeight, previousRawDetents, this.detents)
+      );
+    }
     this.detents = resolved;
     this.lastAppliedHostHeight = hostHeight;
 
@@ -434,9 +450,10 @@ export class BottomSheetWebController {
       Math.abs(targetHeight - currentVisibleHeight) <= 0.5 ||
       !this.shouldAnimateContentHeight(this.targetIndex)
     ) {
+      this.scrimPinnedFull = false;
+      this.scrimOpacityFloor = 0;
       this.setTranslateY(targetTy);
       this.emitPosition();
-      this.scrimPinnedFull = false;
     } else {
       // The target detent changed height: re-anchor at the current visible
       // height, then animate to the new one. The surface covers the full

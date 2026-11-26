@@ -75,6 +75,7 @@ export type GesturesHost = {
   isPanning: boolean;
   pendingIndex: number | null;
   scrimPinnedFull: boolean;
+  scrimOpacityFloor: number;
   requireConfig(): BottomSheetWebConfig;
   setTranslateY(ty: number): void;
   emitPosition(): void;
@@ -288,6 +289,7 @@ export class SheetGestures {
     // The user takes control: drop any index retained from props.
     host.pendingIndex = null;
     host.scrimPinnedFull = false;
+    host.scrimOpacityFloor = 0;
     gesture.startingIndex = host.targetIndex;
     gesture.dragDetents = host.detents;
     gesture.dragRange = host.snapping.draggableRange(host.targetIndex);

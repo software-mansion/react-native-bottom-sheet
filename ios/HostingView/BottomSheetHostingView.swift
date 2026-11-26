@@ -156,6 +156,7 @@ public final class BottomSheetHostingView: UIView {
   var activeSpringTargetIndex: Int = 0
   var activeSpringEmitsSettle = false
   var scrimPinnedFull = false
+  var scrimOpacityFloor: CGFloat = 0
   private var displayLink: CADisplayLink?
   var pendingIndex: Int?
   var pendingSnapRequest: PendingSnapRequest?
@@ -637,6 +638,7 @@ public final class BottomSheetHostingView: UIView {
     activeSpringEmitsSettle = false
     interruptedSpringEmitsSettle = nil
     scrimPinnedFull = false
+    scrimOpacityFloor = 0
     lastAppliedMaxDetentHeight = .nan
     stopDisplayLink()
     removeSettleAnimations()

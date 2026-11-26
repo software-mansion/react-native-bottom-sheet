@@ -131,6 +131,7 @@ extension BottomSheetHostingView {
     targetIndex = index
     if !preserveScrimPin {
       scrimPinnedFull = false
+      scrimOpacityFloor = 0
     }
 
     let currentTy: CGFloat
@@ -231,10 +232,11 @@ extension BottomSheetHostingView {
     stopDisplayLink()
     removeSettleAnimations()
 
+    scrimPinnedFull = false
+    scrimOpacityFloor = 0
     setSheetTranslation(targetTy)
     refitScrollIndicators()
     emitPosition()
-    scrimPinnedFull = false
     setContentInteractionEnabled(true)
     updateInteractionState()
     refreshScrimAccessibilityFrameIfFocused()

@@ -20,6 +20,7 @@ export type SnappingHost = {
   targetIndex: number;
   pendingIndex: number | null;
   scrimPinnedFull: boolean;
+  scrimOpacityFloor: number;
   setTranslateY(ty: number): void;
   requestFrame(): void;
   emitPosition(): void;
@@ -185,6 +186,7 @@ export class SheetSnapping {
     host.targetIndex = index;
     if (!preserveScrimPin) {
       host.scrimPinnedFull = false;
+      host.scrimOpacityFloor = 0;
     }
 
     const now = performance.now();
@@ -234,6 +236,7 @@ export class SheetSnapping {
     this.springEmitsSettle = false;
     host.setTranslateY(this.translationY(index));
     host.scrimPinnedFull = false;
+    host.scrimOpacityFloor = 0;
     host.emitPosition();
     host.updateCloseRequestRegistration();
     if (emitSettle) {

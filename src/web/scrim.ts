@@ -16,6 +16,8 @@ export type ScrimHost = {
   readonly hasLaidOut: boolean;
   readonly isPanning: boolean;
   readonly scrimPinnedFull: boolean;
+  readonly scrimOpacityFloor: number;
+  readonly targetIndex: number;
   readonly detents: ResolvedDetent[];
   readonly hostHeight: number;
   /** Whether a scrim press would ask the sheet to close. */
@@ -37,13 +39,22 @@ export const applyScrim = (host: ScrimHost, position: number) => {
   if (host.config.modal && host.hasLaidOut && !isSettledClosed) {
     // While the sheet is fully open and only its geometry is resizing, hold
     // the fully-open opacity instead of dipping it until the re-anchor ends.
-    opacity = host.scrimPinnedFull
-      ? scrimOpacity(
-          Math.max(0, ...host.detents.map((detent) => detent.position)),
-          host.config.detents,
-          host.detents
-        )
-      : scrimOpacity(position, host.config.detents, host.detents);
+    if (host.scrimPinnedFull) {
+      opacity = scrimOpacity(
+        Math.max(0, ...host.detents.map((detent) => detent.position)),
+        host.config.detents,
+        host.detents
+      );
+    } else {
+      const targetDetent = host.detents[host.targetIndex];
+      const targetOpacity = targetDetent
+        ? scrimOpacity(targetDetent.position, host.config.detents, host.detents)
+        : 0;
+      opacity = Math.max(
+        scrimOpacity(position, host.config.detents, host.detents),
+        Math.min(host.scrimOpacityFloor, targetOpacity)
+      );
+    }
   }
   const isVisible = opacity > 0.001;
   scrim.style.opacity = String(isVisible ? opacity : 0);
@@ -80,7 +91,7 @@ const applyScrimDismiss = (host: ScrimHost, position: number) => {
   }
 };
 
-const scrimOpacity = (
+export const scrimOpacity = (
   position: number,
   rawDetents: ReadonlyArray<RawDetent>,
   detents: ResolvedDetent[]

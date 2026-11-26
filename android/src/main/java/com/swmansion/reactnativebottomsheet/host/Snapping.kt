@@ -153,6 +153,7 @@ internal class Snapping(
     }
     if (!preserveScrimPin) {
       state.scrimPinnedFull = false
+      state.scrimOpacityFloor = 0f
     }
 
     val targetTy = translationY(index)
@@ -188,6 +189,7 @@ internal class Snapping(
       state.activeAnimationEmitsSettle = false
       state.suppressScrimForClosingTarget = false
       state.scrimPinnedFull = false
+      state.scrimOpacityFloor = 0f
       if (state.closedIndex == index) {
         state.sheetContainer.translationY = translationY(index)
         scrim.hideScrim()

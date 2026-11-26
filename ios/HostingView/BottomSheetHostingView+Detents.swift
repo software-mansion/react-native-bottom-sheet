@@ -221,6 +221,7 @@ extension BottomSheetHostingView {
     // was computed against — not the freshly resolved one.
     let previousMaxHeight =
       lastAppliedMaxDetentHeight.isFinite ? lastAppliedMaxDetentHeight : sheetContainerHeight
+    let previousVisibleHeight = previousMaxHeight - currentTranslationY
     // Whether the scrim is currently fully opaque, i.e. the sheet is settled at
     // or above the first non-zero detent. If so, a detent resize must not dip
     // the scrim while the sheet re-anchors to the new geometry.
@@ -228,8 +229,11 @@ extension BottomSheetHostingView {
       && !isPanning
       && modal
       && firstOpenDetentPosition > 0
-      && currentSheetHeight + 0.5 >= firstOpenDetentPosition
+      && previousVisibleHeight + 0.5 >= firstOpenDetentPosition
     scrimPinnedFull = scrimPinnedFull || wasScrimFull
+    if hasLaidOut, !isPanning, modal, !scrimPinnedFull {
+      scrimOpacityFloor = max(scrimOpacityFloor, scrimOpacity(forPosition: previousVisibleHeight))
+    }
     detentSpecs = resolvedDetents
 
     guard bounds.width > 0, bounds.height > 0, !detentSpecs.isEmpty else {
@@ -263,13 +267,15 @@ extension BottomSheetHostingView {
         let shouldAnimateHeight = shouldAnimateContentHeight(at: targetIndex)
         if abs(targetHeight - currentVisibleHeight) <= 0.5 {
           // No meaningful change.
+          scrimPinnedFull = false
+          scrimOpacityFloor = 0
           setSheetTranslation(targetTy)
           emitPosition()
-          scrimPinnedFull = false
         } else if !shouldAnimateHeight {
+          scrimPinnedFull = false
+          scrimOpacityFloor = 0
           setSheetTranslation(targetTy)
           emitPosition()
-          scrimPinnedFull = false
         } else {
           // The content detent changed (grew or shrank): re-anchor at the
           // current visible height, then animate to the new target. The surface
