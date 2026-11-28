@@ -47,9 +47,12 @@ internal class ScrollIndicators(private val state: SheetState) {
     refit(view, fitted)
   }
 
+  // A weak key can disappear after toList() reads a singleton size. Copy by iteration instead.
+  private fun snapshotViews() = ArrayList(views)
+
   fun refit() {
     if (views.isEmpty() || Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
-    for (view in views.toList()) {
+    for (view in snapshotViews()) {
       val fitted = view.verticalScrollbarThumbDrawable as? FittedThumb
       when {
         // Another sheet took it over, or the app replaced the thumb.
@@ -63,7 +66,7 @@ internal class ScrollIndicators(private val state: SheetState) {
   /** Gives every scrollable this sheet fits its original thumb back. */
   fun releaseAll() {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) return
-    for (view in views.toList()) {
+    for (view in snapshotViews()) {
       val fitted = view.verticalScrollbarThumbDrawable as? FittedThumb
       if (fitted != null && fitted.owner === this) release(view, fitted)
     }
