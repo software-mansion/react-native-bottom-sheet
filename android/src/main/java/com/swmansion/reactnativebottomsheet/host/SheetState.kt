@@ -67,7 +67,7 @@ internal class SheetState(val hostView: ViewGroup, val sheetContainer: BottomShe
   var initialTouchY = 0f
   var initialTouchX = 0f
   var suppressScrimForClosingTarget = false
-  var scrimPinnedFull = false
+  var reanchorScrimOpacity: Float? = null
 
   // The height the container geometry and translations are currently anchored
   // to. It can change after a layout (rotation), and translations computed

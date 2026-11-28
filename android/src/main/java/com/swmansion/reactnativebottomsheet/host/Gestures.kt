@@ -212,7 +212,7 @@ internal class Gestures(
     state.isPanning = true
     // The user takes control: drop any index retained from props.
     state.pendingIndex = null
-    state.scrimPinnedFull = false
+    state.reanchorScrimOpacity = null
     state.panStartingIndex = state.targetIndex
     val dragDetentSpecs = state.detentSpecs.toList()
     state.activeDragDetentSpecs = dragDetentSpecs

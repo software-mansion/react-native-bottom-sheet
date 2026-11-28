@@ -38,7 +38,7 @@ struct PendingSnapRequest {
   let velocity: CGFloat
   let emitIndexChange: Bool
   let emitSettle: Bool
-  let preserveScrimPin: Bool
+  let preserveScrimOpacity: Bool
 }
 
 enum PanCoordinationMode {

@@ -221,15 +221,10 @@ extension BottomSheetHostingView {
     // was computed against — not the freshly resolved one.
     let previousMaxHeight =
       lastAppliedMaxDetentHeight.isFinite ? lastAppliedMaxDetentHeight : sheetContainerHeight
-    // Whether the scrim is currently fully opaque, i.e. the sheet is settled at
-    // or above the first non-zero detent. If so, a detent resize must not dip
-    // the scrim while the sheet re-anchors to the new geometry.
-    let wasScrimFull = hasLaidOut
-      && !isPanning
-      && modal
-      && firstOpenDetentPosition > 0
-      && currentSheetHeight + 0.5 >= firstOpenDetentPosition
-    scrimPinnedFull = scrimPinnedFull || wasScrimFull
+    // Keep the last rendered opacity as the starting bound for the new geometry.
+    if hasLaidOut, !isPanning, modal {
+      reanchorScrimOpacity = scrimView.alpha
+    }
     detentSpecs = resolvedDetents
 
     guard bounds.width > 0, bounds.height > 0, !detentSpecs.isEmpty else {
@@ -255,7 +250,7 @@ extension BottomSheetHostingView {
           velocity: 0,
           emitIndexChange: false,
           emitSettle: shouldEmitSettle,
-          preserveScrimPin: true
+          preserveScrimOpacity: true
         )
       } else {
         let currentVisibleHeight = previousMaxHeight - currentTranslationY
@@ -263,13 +258,13 @@ extension BottomSheetHostingView {
         let shouldAnimateHeight = shouldAnimateContentHeight(at: targetIndex)
         if abs(targetHeight - currentVisibleHeight) <= 0.5 {
           // No meaningful change.
+          reanchorScrimOpacity = nil
           setSheetTranslation(targetTy)
           emitPosition()
-          scrimPinnedFull = false
         } else if !shouldAnimateHeight {
+          reanchorScrimOpacity = nil
           setSheetTranslation(targetTy)
           emitPosition()
-          scrimPinnedFull = false
         } else {
           // The content detent changed (grew or shrank): re-anchor at the
           // current visible height, then animate to the new target. The surface
@@ -282,7 +277,7 @@ extension BottomSheetHostingView {
             velocity: 0,
             emitIndexChange: false,
             emitSettle: false,
-            preserveScrimPin: true
+            preserveScrimOpacity: true
           )
         }
       }

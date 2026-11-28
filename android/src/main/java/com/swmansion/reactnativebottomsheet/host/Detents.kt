@@ -50,7 +50,7 @@ internal class Detents(
     // Entries without a value are dropped up front, so the specs and the scrim
     // opacities stay aligned by index.
     val entries = raw.filter { it["value"] is Number }
-    scrim.scrimOpacities = entries.map { (it["scrimOpacity"] as? Number)?.toFloat() ?: 1f }
+    val newScrimOpacities = entries.map { (it["scrimOpacity"] as? Number)?.toFloat() ?: 1f }
     state.rawDetentSpecs = entries.map { dict ->
       val value = (dict["value"] as Number).toDouble()
       val kind =
@@ -107,6 +107,7 @@ internal class Detents(
       contentRegion.isContentRegionChangePending = true
     }
     contentRegion.recomputeNativeGeometry()
+    scrim.scrimOpacities = newScrimOpacities
     refreshDetentsFromLayout()
     // The re-resolved detents can change the card's shape at its current position.
     contentRegion.recomputeNativeGeometry()
@@ -257,13 +258,7 @@ internal class Detents(
     val previousMaxHeight =
       if (state.lastAppliedMaxDetentHeight.isFinite()) state.lastAppliedMaxDetentHeight
       else state.height.toFloat()
-    // Whether the scrim is currently fully opaque, i.e. the sheet is settled at
-    // or above the first non-zero detent. If so, a detent resize must not dip
-    // the scrim while the sheet re-anchors to the new geometry.
-    val wasScrimFull =
-      state.modal &&
-        state.firstOpenDetentPosition > 0f &&
-        state.currentSheetHeight() + 0.5f >= state.firstOpenDetentPosition
+    val previousScrimOpacity = scrim.scrimProgress
     state.detentSpecs = resolvedDetents
     if (state.width > 0 && state.height > 0 && state.detentSpecs.isNotEmpty()) {
       host.layoutSheetContainer(state.width, state.height)
@@ -290,14 +285,14 @@ internal class Detents(
           val visibleHeight = previousMaxHeight - currentTy
           state.sheetContainer.translationY =
             (newMaxHeight - visibleHeight).coerceIn(0f, newMaxHeight)
-          state.scrimPinnedFull = state.scrimPinnedFull || wasScrimFull
+          state.reanchorScrimOpacity = previousScrimOpacity
           snapping.emitPosition()
           snapping.snapToIndex(
             state.targetIndex,
             0f,
             emitIndexChange = false,
             emitSettle = shouldEmitSettle,
-            preserveScrimPin = true,
+            preserveScrimOpacity = true,
           )
         } else {
           val currentVisibleHeight = previousMaxHeight - state.sheetContainer.translationY
@@ -305,10 +300,12 @@ internal class Detents(
           val shouldAnimateHeight = shouldAnimateContentHeight(state.targetIndex)
           if (kotlin.math.abs(targetHeight - currentVisibleHeight) <= 0.5f) {
             // No meaningful change.
+            state.reanchorScrimOpacity = null
             closeRequestPresentationTracker.onTransitionSettled()
             state.sheetContainer.translationY = targetTy
             snapping.emitPosition()
           } else if (!shouldAnimateHeight) {
+            state.reanchorScrimOpacity = null
             closeRequestPresentationTracker.onTransitionSettled()
             state.sheetContainer.translationY = targetTy
             snapping.emitPosition()
@@ -319,14 +316,14 @@ internal class Detents(
             // blank space.
             state.sheetContainer.translationY =
               (newMaxHeight - currentVisibleHeight).coerceIn(0f, newMaxHeight)
-            state.scrimPinnedFull = state.scrimPinnedFull || wasScrimFull
+            state.reanchorScrimOpacity = previousScrimOpacity
             snapping.emitPosition()
             snapping.snapToIndex(
               state.targetIndex,
               0f,
               emitIndexChange = false,
               emitSettle = false,
-              preserveScrimPin = true,
+              preserveScrimOpacity = true,
             )
           }
         }

@@ -9,10 +9,8 @@ import {
   areNumbersEqual,
   areRawDetentsEqual,
   areResolvedDetentsEqual,
-  areScrimOpacitiesEqual,
   areShadowsEqual,
   contentRegionHeight,
-  firstOpenPosition,
   isInvalidContentDetentTarget,
   resolveDetentSpecs,
   surfaceOverflow,
@@ -67,7 +65,7 @@ export class BottomSheetWebController {
   translateY = 0;
   lastReportedError: string | null = null;
 
-  scrimPinnedFull = false;
+  reanchorScrimOpacity: number | null = null;
   isPanning = false;
 
   private frameRequest: number | null = null;
@@ -168,12 +166,6 @@ export class BottomSheetWebController {
     this.config = config;
     if (previous !== null && config.openOrder > previous.openOrder) {
       raiseCloseRequestRegistration(this);
-    }
-    if (
-      previous !== null &&
-      !areScrimOpacitiesEqual(previous.detents, config.detents)
-    ) {
-      this.updateScrim();
     }
     if (
       previous === null ||
@@ -398,14 +390,11 @@ export class BottomSheetWebController {
     const previousHostHeight = Number.isFinite(this.lastAppliedHostHeight)
       ? this.lastAppliedHostHeight
       : hostHeight;
-    const firstOpen = firstOpenPosition(this.detents);
-    const wasScrimFull =
-      this.hasLaidOut &&
-      !this.isPanning &&
-      this.requireConfig().modal &&
-      firstOpen > 0 &&
-      previousHostHeight - this.snapping.currentTranslateY() + 0.5 >= firstOpen;
-    this.scrimPinnedFull = this.scrimPinnedFull || wasScrimFull;
+    if (this.hasLaidOut && !this.isPanning && this.requireConfig().modal) {
+      this.reanchorScrimOpacity = Number(
+        this.elements?.scrim.style.opacity ?? 0
+      );
+    }
     this.detents = resolved;
     this.lastAppliedHostHeight = hostHeight;
 
@@ -434,9 +423,9 @@ export class BottomSheetWebController {
       Math.abs(targetHeight - currentVisibleHeight) <= 0.5 ||
       !this.shouldAnimateContentHeight(this.targetIndex)
     ) {
+      this.reanchorScrimOpacity = null;
       this.setTranslateY(targetTy);
       this.emitPosition();
-      this.scrimPinnedFull = false;
     } else {
       // The target detent changed height: re-anchor at the current visible
       // height, then animate to the new one. The surface covers the full

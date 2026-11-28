@@ -140,7 +140,7 @@ internal class Snapping(
     velocity: Float,
     emitIndexChange: Boolean = true,
     emitSettle: Boolean = true,
-    preserveScrimPin: Boolean = false,
+    preserveScrimOpacity: Boolean = false,
   ) {
     if (index < 0 || index >= state.detentSpecs.size) return
     if (emitIndexChange) {
@@ -151,8 +151,8 @@ internal class Snapping(
     if (!state.isTargetingClosedDetent) {
       state.suppressScrimForClosingTarget = false
     }
-    if (!preserveScrimPin) {
-      state.scrimPinnedFull = false
+    if (!preserveScrimOpacity) {
+      state.reanchorScrimOpacity = null
     }
 
     val targetTy = translationY(index)
@@ -187,7 +187,7 @@ internal class Snapping(
       state.activeAnimation = null
       state.activeAnimationEmitsSettle = false
       state.suppressScrimForClosingTarget = false
-      state.scrimPinnedFull = false
+      state.reanchorScrimOpacity = null
       if (state.closedIndex == index) {
         state.sheetContainer.translationY = translationY(index)
         scrim.hideScrim()

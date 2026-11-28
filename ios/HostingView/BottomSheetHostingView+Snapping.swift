@@ -106,7 +106,7 @@ extension BottomSheetHostingView {
     velocity: CGFloat,
     emitIndexChange: Bool = true,
     emitSettle: Bool = true,
-    preserveScrimPin: Bool = false
+    preserveScrimOpacity: Bool = false
   ) {
     guard index >= 0, index < detentSpecs.count else { return }
     // A newer snap supersedes the one a pan stopped.
@@ -123,14 +123,14 @@ extension BottomSheetHostingView {
         velocity: velocity,
         emitIndexChange: emitIndexChange,
         emitSettle: emitSettle,
-        preserveScrimPin: preserveScrimPin
+        preserveScrimOpacity: preserveScrimOpacity
       )
       return
     }
 
     targetIndex = index
-    if !preserveScrimPin {
-      scrimPinnedFull = false
+    if !preserveScrimOpacity {
+      reanchorScrimOpacity = nil
     }
 
     let currentTy: CGFloat
@@ -209,7 +209,7 @@ extension BottomSheetHostingView {
       velocity: request.velocity,
       emitIndexChange: request.emitIndexChange,
       emitSettle: request.emitSettle,
-      preserveScrimPin: request.preserveScrimPin
+      preserveScrimOpacity: request.preserveScrimOpacity
     )
   }
 
@@ -231,10 +231,10 @@ extension BottomSheetHostingView {
     stopDisplayLink()
     removeSettleAnimations()
 
+    reanchorScrimOpacity = nil
     setSheetTranslation(targetTy)
     refitScrollIndicators()
     emitPosition()
-    scrimPinnedFull = false
     setContentInteractionEnabled(true)
     updateInteractionState()
     refreshScrimAccessibilityFrameIfFocused()

@@ -11,8 +11,8 @@ internal class Scrim(private val state: SheetState) {
   // Scrim opacity per detent index, from each detent’s `scrimOpacity`. Kept apart from
   // `rawDetentSpecs`, so a scrim change only repaints the scrim.
   var scrimOpacities = emptyList<Float>()
-  private var scrimProgress = 0f
-    set(value) {
+  var scrimProgress = 0f
+    private set(value) {
       val wasVisible = field > VISIBLE_THRESHOLD
       field = value
       if (wasVisible != (value > VISIBLE_THRESHOLD)) onVisibilityChanged?.invoke()
@@ -47,24 +47,17 @@ internal class Scrim(private val state: SheetState) {
       return
     }
 
-    // While the sheet is fully open and only its content/detent geometry is
-    // resizing, the position momentarily lags the grown detent height. Keep the
-    // scrim pinned to the fully-open opacity instead of dipping it until the
-    // re-anchor settles.
-    if (state.scrimPinnedFull) {
-      scrimProgress = fullyOpenScrimOpacity()
-      state.hostView.invalidate()
-      return
-    }
-
-    scrimProgress = scrimOpacityAt(position)
+    val opacity = scrimOpacityAt(position)
+    val start = state.reanchorScrimOpacity
+    val target = state.detentSpecs.getOrNull(state.targetIndex)
+    scrimProgress =
+      if (start != null && target != null) {
+        val end = scrimOpacityAt(target.position)
+        opacity.coerceIn(minOf(start, end), maxOf(start, end))
+      } else {
+        opacity
+      }
     state.hostView.invalidate()
-  }
-
-  /** The opacity at the tallest detent, held while the sheet re-anchors. */
-  private fun fullyOpenScrimOpacity(): Float {
-    val maxPosition = state.detentSpecs.maxOfOrNull { it.position } ?: return 1f
-    return scrimOpacityAt(maxPosition)
   }
 
   /**

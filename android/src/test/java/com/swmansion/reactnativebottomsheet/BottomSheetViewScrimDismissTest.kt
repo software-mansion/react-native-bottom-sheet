@@ -1,10 +1,13 @@
 package com.swmansion.reactnativebottomsheet
 
 import android.app.Activity
+import android.graphics.Canvas
 import android.graphics.Color
+import android.graphics.Paint
 import android.os.Looper
 import android.view.MotionEvent
 import android.view.View
+import android.view.ViewGroup
 import androidx.activity.ComponentActivity
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.facebook.react.internal.featureflags.ReactNativeFeatureFlagsForTests
@@ -120,15 +123,90 @@ class BottomSheetViewScrimDismissTest {
     }
   }
 
+  @Test
+  fun `growing the open detent mid-settle does not dip the scrim opacity`() {
+    val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+    val activity = controller.get()
+    val host = BottomSheetHostView(activity)
+    try {
+      host.animateIn = false
+      host.modal = true
+      host.setScrimColor(Color.BLACK)
+      fun detents(middleHeight: Double, middleOpacity: Double) =
+        listOf(
+          mapOf("value" to 0.0, "scrimOpacity" to 0.0),
+          mapOf("value" to middleHeight, "scrimOpacity" to middleOpacity),
+          mapOf("value" to 900.0, "scrimOpacity" to 1.0),
+        )
+      host.setDetents(detents(100.0, 0.5))
+      host.setIndex(1)
+      activity.setContentView(host, ViewGroup.LayoutParams(1080, 1920))
+      layoutView(host)
+      val beforeAlpha = readScrimAlpha(host)
+      assertEquals(127, beforeAlpha)
+
+      // Start a spring, then resize before it advances. At the current 100pt position
+      // the new geometry alone would yield 0.12; the last rendered opacity is 0.5.
+      host.setIndex(2)
+      val grownDetents = detents(500.0, 0.6)
+      host.setDetents(grownDetents)
+      assertEquals(beforeAlpha, readScrimAlpha(host))
+
+      host.setIndex(0)
+      host.setDetents(grownDetents)
+      assertTrue(readScrimAlpha(host) < beforeAlpha)
+    } finally {
+      host.destroy()
+      shadowOf(Looper.getMainLooper()).idle()
+      controller.close()
+    }
+  }
+
+  @Test
+  fun `shrinking the host height while settled at an open detent keeps a transparent scrim transparent`() {
+    val controller = Robolectric.buildActivity(ComponentActivity::class.java).setup()
+    val activity = controller.get()
+    val host = BottomSheetHostView(activity)
+    try {
+      host.animateIn = false
+      host.modal = true
+      host.setScrimColor(Color.BLACK)
+      host.setDetents(
+        listOf(
+          mapOf("value" to 0.0, "kind" to "points", "scrimOpacity" to 0.0),
+          mapOf("value" to 0.5, "kind" to "percentage", "scrimOpacity" to 0.0),
+          mapOf("value" to 1.0, "kind" to "percentage", "scrimOpacity" to 1.0),
+        ),
+      )
+      host.setIndex(1)
+      activity.setContentView(host, ViewGroup.LayoutParams(1080, 1920))
+      layoutView(host, height = 1920)
+
+      assertEquals(0, readScrimAlpha(host))
+      layoutView(host, height = 1000)
+      assertEquals(0, readScrimAlpha(host))
+    } finally {
+      host.destroy()
+      shadowOf(Looper.getMainLooper()).idle()
+      controller.close()
+    }
+  }
+
+  private fun readScrimAlpha(host: BottomSheetHostView): Int {
+    val canvas = RecordingScrimCanvas()
+    host.draw(canvas)
+    return canvas.lastAlpha
+  }
+
   /**
    * Grows the open detent, which re-anchors the sheet and pins the scrim until the spring ends. The
-   * sheet is still below the detent's position, where the scrim is invisible unless it is pinned.
+   * sheet is still below the detent's position, where interpolation alone would reduce the opacity.
    */
   private fun pinScrimWithReanchor(sheet: BottomSheetView) {
     sheet.setDetents(
       listOf(
         mapOf("value" to 0.0, "scrimOpacity" to 0.0),
-        mapOf("value" to 320.0, "scrimOpacity" to 0.0),
+        mapOf("value" to 320.0, "scrimOpacity" to 1.0),
         mapOf("value" to 600.0, "scrimOpacity" to 1.0),
       ),
     )
@@ -192,15 +270,22 @@ class BottomSheetViewScrimDismissTest {
     up.recycle()
   }
 
-  private fun layoutView(view: View) {
+  private fun layoutView(view: View, height: Int = 1920) {
     val width = 1080
-    val height = 1920
     view.measure(
       View.MeasureSpec.makeMeasureSpec(width, View.MeasureSpec.EXACTLY),
       View.MeasureSpec.makeMeasureSpec(height, View.MeasureSpec.EXACTLY),
     )
     view.layout(0, 0, width, height)
     shadowOf(Looper.getMainLooper()).idle()
+  }
+}
+
+private class RecordingScrimCanvas : Canvas() {
+  var lastAlpha = 0
+
+  override fun drawRect(left: Float, top: Float, right: Float, bottom: Float, paint: Paint) {
+    lastAlpha = Color.alpha(paint.color)
   }
 }
 
