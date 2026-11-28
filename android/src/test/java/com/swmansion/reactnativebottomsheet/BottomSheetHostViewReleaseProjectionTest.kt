@@ -9,6 +9,7 @@ import android.widget.FrameLayout
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.facebook.react.internal.featureflags.ReactNativeFeatureFlagsForTests
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -43,6 +44,18 @@ class BottomSheetHostViewReleaseProjectionTest {
       sheet.drag(-120f to 240L, 0f to 300L)
 
       assertEquals(listOf(1), listener.indexChanges)
+    }
+  }
+
+  @Test
+  fun `a drag past the largest detent follows with tension and settles back on it`() {
+    withSheet(listOf(0.0, 300.0, 600.0)) { sheet, listener ->
+      sheet.drag(-700f to 700L, 0f to 300L)
+
+      val highest = listener.positions.max()
+      assertTrue("moved past the detent: $highest", highest > 600.0)
+      assertTrue("with tension: $highest", highest < 600.0 + 400.0 * 0.55)
+      assertEquals(listOf(2), listener.indexChanges)
     }
   }
 
@@ -124,9 +137,11 @@ class BottomSheetHostViewReleaseProjectionTest {
 
 private class RecordingListener : BottomSheetViewListener {
   val indexChanges = mutableListOf<Int>()
+  val positions = mutableListOf<Double>()
 
   fun clear() {
     indexChanges.clear()
+    positions.clear()
   }
 
   override fun onIndexChange(index: Int) {
@@ -135,7 +150,9 @@ private class RecordingListener : BottomSheetViewListener {
 
   override fun onSettle(index: Int) = Unit
 
-  override fun onPositionChange(position: Double, index: Double) = Unit
+  override fun onPositionChange(position: Double, index: Double) {
+    positions.add(position)
+  }
 
   override fun onCloseRequest() = Unit
 }

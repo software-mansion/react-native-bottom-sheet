@@ -6,6 +6,7 @@ extension BottomSheetHostingView {
 
     switch gesture.state {
     case .began:
+      panOverdrag = 0
       interruptedSpringEmitsSettle = activeSpring == nil ? nil : activeSpringEmitsSettle
       if activeSpring != nil {
         cancelActiveSpring()
@@ -104,7 +105,16 @@ extension BottomSheetHostingView {
       pinActiveScrollViews()
       let minTy = range.minTy
       let maxTy = range.maxTy
-      let newTy = max(minTy, min(maxTy, sheetContainer.transform.ty + delta))
+      // Past the largest detent the sheet follows with tension and settles
+      // back on release, unless the content takes over there.
+      let rawTy = (panOverdrag > 0 ? minTy - panOverdrag : sheetContainer.transform.ty) + delta
+      panOverdrag =
+        activeScrollCoordinationLevel == .handoff && !activeScrollViewStates.isEmpty
+        ? 0 : max(0, minTy - rawTy)
+      let newTy =
+        panOverdrag > 0
+        ? minTy - rubberBand(panOverdrag, dimension: minTy)
+        : max(minTy, min(maxTy, rawTy))
       if abs(newTy - sheetContainer.transform.ty) > .ulpOfOne {
         cancelContentTouchesForPanIfNeeded()
         didMoveSheetDuringPan = true
@@ -350,4 +360,11 @@ extension BottomSheetHostingView: UIGestureRecognizerDelegate {
     }
     return false
   }
+}
+
+/// How far a drag `over` the sheet's largest detent moves it: UIScrollView's
+/// rubber band, following at 0.55 and approaching `dimension`, the room above
+/// that detent, so the sheet never lifts off the bottom edge.
+private func rubberBand(_ over: CGFloat, dimension: CGFloat) -> CGFloat {
+  dimension > 0 ? (1 - 1 / (over * 0.55 / dimension + 1)) * dimension : 0
 }

@@ -24,6 +24,9 @@ internal class Gestures(
   private var scrimPressed = false
   private var scrimTouchActive = false
 
+  // How far the drag has gone past the largest detent, before tension.
+  private var overdrag = 0f
+
   fun onInterceptTouchEvent(event: MotionEvent): Boolean {
     if (event.actionMasked == MotionEvent.ACTION_DOWN) {
       scrollCoordination.clearNestedScrollState()
@@ -173,8 +176,16 @@ internal class Gestures(
         lastTouchY = y
 
         val dragRange = state.activeDragRange ?: snapping.draggableRange(state.panStartingIndex)
+        // Past the largest detent the sheet follows with tension and settles back on release.
+        val rawTy =
+          (if (overdrag > 0f) dragRange.start - overdrag else state.sheetContainer.translationY) + dy
+        overdrag = (dragRange.start - rawTy).coerceAtLeast(0f)
         val newTy =
-          (state.sheetContainer.translationY + dy).coerceIn(dragRange.start, dragRange.endInclusive)
+          if (overdrag > 0f) {
+            dragRange.start - rubberBand(overdrag, dragRange.start)
+          } else {
+            rawTy.coerceAtMost(dragRange.endInclusive)
+          }
         state.sheetContainer.translationY = newTy
         snapping.emitPosition()
         return true
@@ -214,6 +225,7 @@ internal class Gestures(
     state.pendingIndex = null
     state.scrimPinnedFull = false
     state.panStartingIndex = state.targetIndex
+    overdrag = 0f
     val dragDetentSpecs = state.detentSpecs.toList()
     state.activeDragDetentSpecs = dragDetentSpecs
     state.activeDragRange = snapping.snapshotDraggableRange(state.targetIndex, dragDetentSpecs)
@@ -268,3 +280,11 @@ internal class Gestures(
     scrimTouchActive = false
   }
 }
+
+/**
+ * How far a drag [over] the sheet's largest detent moves it: UIScrollView's rubber band, following
+ * at 0.55 and approaching [dimension], the room above that detent, so the sheet never lifts off the
+ * bottom edge.
+ */
+internal fun rubberBand(over: Float, dimension: Float): Float =
+  if (dimension > 0f) (1f - 1f / (over * 0.55f / dimension + 1f)) * dimension else 0f

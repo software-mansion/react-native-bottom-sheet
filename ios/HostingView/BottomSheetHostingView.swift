@@ -177,6 +177,8 @@ public final class BottomSheetHostingView: UIView {
   var panCoordinationMode: PanCoordinationMode = .sheet
   var activeScrollCoordinationLevel: ScrollCoordinationLevel = .none
   var didMoveSheetDuringPan = false
+  /// How far the pan has gone past the largest detent, before tension.
+  var panOverdrag: CGFloat = 0
   /// Whether the spring a pan stopped as it began emitted `onSettle`; nil when
   /// no spring was running.
   var interruptedSpringEmitsSettle: Bool?
