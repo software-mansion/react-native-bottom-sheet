@@ -814,8 +814,7 @@ extension BottomSheetHostingView {
     }
     isPanning = true
     pendingIndex = nil
-    scrimPinnedFull = false
-    scrimOpacityFloor = 0
+    reanchorScrimOpacity = nil
     let pin = ActiveScrollViewState(scrollView: scrollView, inverted: false, wasAtStartWhenTouched: true)
     pin.startPinning(at: scrollStartOffset(for: scrollView, inverted: false))
     drag.handoff = IndicatorDragState.Handoff(

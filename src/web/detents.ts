@@ -290,17 +290,6 @@ export const areRawDetentsEqual = (
       detent.placementBias === b[index]!.placementBias
   );
 
-// Compared apart from `areRawDetentsEqual`: A scrim change only repaints the
-// scrim, and doesn’t re-resolve the detents.
-export const areScrimOpacitiesEqual = (
-  a: ReadonlyArray<RawDetent>,
-  b: ReadonlyArray<RawDetent>
-) =>
-  areNumbersEqual(
-    a.map((detent) => detent.scrimOpacity),
-    b.map((detent) => detent.scrimOpacity)
-  );
-
 export const areResolvedDetentsEqual = (
   a: ResolvedDetent[],
   b: ResolvedDetent[]

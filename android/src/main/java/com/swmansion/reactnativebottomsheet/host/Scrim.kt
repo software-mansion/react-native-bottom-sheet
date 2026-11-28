@@ -11,8 +11,8 @@ internal class Scrim(private val state: SheetState) {
   // Scrim opacity per detent index, from each detent’s `scrimOpacity`. Kept apart from
   // `rawDetentSpecs`, so a scrim change only repaints the scrim.
   var scrimOpacities = emptyList<Float>()
-  private var scrimProgress = 0f
-    set(value) {
+  var scrimProgress = 0f
+    private set(value) {
       val wasVisible = field > VISIBLE_THRESHOLD
       field = value
       if (wasVisible != (value > VISIBLE_THRESHOLD)) onVisibilityChanged?.invoke()
@@ -47,37 +47,28 @@ internal class Scrim(private val state: SheetState) {
       return
     }
 
-    // While the sheet is fully open and only its content/detent geometry is
-    // resizing, the position momentarily lags the grown detent height. Keep the
-    // scrim pinned to the fully-open opacity instead of dipping it until the
-    // re-anchor settles.
-    if (state.scrimPinnedFull) {
-      scrimProgress = fullyOpenScrimOpacity()
-      state.hostView.invalidate()
-      return
-    }
-
-    val targetOpacity =
-      state.detentSpecs.getOrNull(state.targetIndex)?.let { scrimOpacityAt(it.position) } ?: 0f
-    scrimProgress = maxOf(scrimOpacityAt(position), minOf(state.scrimOpacityFloor, targetOpacity))
+    val opacity = scrimOpacityAt(position)
+    val start = state.reanchorScrimOpacity
+    val target = state.detentSpecs.getOrNull(state.targetIndex)
+    scrimProgress =
+      if (start != null && target != null) {
+        val end = scrimOpacityAt(target.position)
+        opacity.coerceIn(minOf(start, end), maxOf(start, end))
+      } else {
+        opacity
+      }
     state.hostView.invalidate()
-  }
-
-  /** The opacity at the tallest detent, held while the sheet re-anchors. */
-  private fun fullyOpenScrimOpacity(): Float {
-    val maxPosition = state.detentSpecs.maxOfOrNull { it.position } ?: return 1f
-    return scrimOpacityAt(maxPosition)
   }
 
   /**
    * Interpolates the scrim opacity for a sheet height by bracketing it between adjacent detent
    * heights and lerping each detent index's configured value.
    */
-  fun scrimOpacityAt(position: Float, opacities: List<Float> = scrimOpacities): Float =
+  private fun scrimOpacityAt(position: Float): Float =
     state.interpolateAtPosition(
       position,
       state.detentSpecs.indices.map {
-        (opacities.getOrNull(it) ?: 1f).coerceIn(0f, 1f)
+        (scrimOpacities.getOrNull(it) ?: 1f).coerceIn(0f, 1f)
       },
     )
 

@@ -19,8 +19,7 @@ export type SnappingHost = {
   readonly settleDuration: number;
   targetIndex: number;
   pendingIndex: number | null;
-  scrimPinnedFull: boolean;
-  scrimOpacityFloor: number;
+  reanchorScrimOpacity: number | null;
   setTranslateY(ty: number): void;
   requestFrame(): void;
   emitPosition(): void;
@@ -174,7 +173,7 @@ export class SheetSnapping {
     velocity: number,
     emitIndexChange = true,
     emitSettle = true,
-    preserveScrimPin = false
+    preserveScrimOpacity = false
   ) {
     const host = this.host;
     if (index < 0 || index >= host.detents.length) return;
@@ -184,9 +183,8 @@ export class SheetSnapping {
     }
 
     host.targetIndex = index;
-    if (!preserveScrimPin) {
-      host.scrimPinnedFull = false;
-      host.scrimOpacityFloor = 0;
+    if (!preserveScrimOpacity) {
+      host.reanchorScrimOpacity = null;
     }
 
     const now = performance.now();
@@ -235,8 +233,7 @@ export class SheetSnapping {
     this.spring = null;
     this.springEmitsSettle = false;
     host.setTranslateY(this.translationY(index));
-    host.scrimPinnedFull = false;
-    host.scrimOpacityFloor = 0;
+    host.reanchorScrimOpacity = null;
     host.emitPosition();
     host.updateCloseRequestRegistration();
     if (emitSettle) {

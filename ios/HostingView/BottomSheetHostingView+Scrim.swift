@@ -115,29 +115,13 @@ extension BottomSheetHostingView {
       return
     }
 
-    // While the sheet is fully open and only its content/detent geometry is
-    // resizing, the position momentarily lags the grown detent height. Keep the
-    // scrim pinned to the fully-open opacity instead of dipping it until the
-    // re-anchor settles.
-    if scrimPinnedFull {
-      let opacity = fullyOpenScrimOpacity
-      scrimView.alpha = opacity
-      scrimView.isHidden = opacity <= 0.001
-      return
+    var progress = scrimOpacity(forPosition: position)
+    if let start = reanchorScrimOpacity, detentSpecs.indices.contains(targetIndex) {
+      let end = scrimOpacity(forPosition: detentSpecs[targetIndex].position)
+      progress = min(max(progress, min(start, end)), max(start, end))
     }
-
-    let targetOpacity = detentSpecs.indices.contains(targetIndex)
-      ? scrimOpacity(forPosition: detentSpecs[targetIndex].position)
-      : 0
-    let progress = max(scrimOpacity(forPosition: position), min(scrimOpacityFloor, targetOpacity))
     scrimView.alpha = progress
     scrimView.isHidden = progress <= 0.001
-  }
-
-  /// The opacity at the tallest detent, held while the sheet re-anchors.
-  private var fullyOpenScrimOpacity: CGFloat {
-    guard let maxPosition = detentSpecs.map({ $0.position }).max() else { return 1 }
-    return scrimOpacity(forPosition: maxPosition)
   }
 
   /// Interpolates the scrim opacity for a sheet height by bracketing it between

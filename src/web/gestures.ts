@@ -74,8 +74,7 @@ export type GesturesHost = {
   readonly momentum: Pick<ScrollMomentum, 'cancel' | 'start'>;
   isPanning: boolean;
   pendingIndex: number | null;
-  scrimPinnedFull: boolean;
-  scrimOpacityFloor: number;
+  reanchorScrimOpacity: number | null;
   requireConfig(): BottomSheetWebConfig;
   setTranslateY(ty: number): void;
   emitPosition(): void;
@@ -288,8 +287,7 @@ export class SheetGestures {
     host.isPanning = true;
     // The user takes control: drop any index retained from props.
     host.pendingIndex = null;
-    host.scrimPinnedFull = false;
-    host.scrimOpacityFloor = 0;
+    host.reanchorScrimOpacity = null;
     gesture.startingIndex = host.targetIndex;
     gesture.dragDetents = host.detents;
     gesture.dragRange = host.snapping.draggableRange(host.targetIndex);

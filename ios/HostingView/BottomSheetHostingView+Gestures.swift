@@ -13,8 +13,7 @@ extension BottomSheetHostingView {
       isPanning = true
       // The user takes control: drop any index retained from props.
       pendingIndex = nil
-      scrimPinnedFull = false
-      scrimOpacityFloor = 0
+      reanchorScrimOpacity = nil
       panStartingIndex = targetIndex
       activeDragDetentSpecs = detentSpecs
       activeDragRange = snapshotDraggableRange(including: targetIndex, in: detentSpecs)

@@ -11,12 +11,14 @@ import type {
 
 /** The controller's state that the scrim's opacity derives from. */
 export type ScrimHost = {
-  readonly elements: BottomSheetWebElements | null;
-  readonly config: BottomSheetWebConfig | null;
+  readonly elements: Pick<
+    BottomSheetWebElements,
+    'scrim' | 'scrimDismiss'
+  > | null;
+  readonly config: Pick<BottomSheetWebConfig, 'modal' | 'detents'> | null;
   readonly hasLaidOut: boolean;
   readonly isPanning: boolean;
-  readonly scrimPinnedFull: boolean;
-  readonly scrimOpacityFloor: number;
+  readonly reanchorScrimOpacity: number | null;
   readonly targetIndex: number;
   readonly detents: ResolvedDetent[];
   readonly hostHeight: number;
@@ -37,23 +39,16 @@ export const applyScrim = (host: ScrimHost, position: number) => {
     !host.snapping.isSpringActive &&
     !host.isPanning;
   if (host.config.modal && host.hasLaidOut && !isSettledClosed) {
-    // While the sheet is fully open and only its geometry is resizing, hold
-    // the fully-open opacity instead of dipping it until the re-anchor ends.
-    if (host.scrimPinnedFull) {
-      opacity = scrimOpacity(
-        Math.max(0, ...host.detents.map((detent) => detent.position)),
+    opacity = scrimOpacity(position, host.config.detents, host.detents);
+    const start = host.reanchorScrimOpacity;
+    const target = host.detents[host.targetIndex];
+    if (start !== null && target) {
+      const end = scrimOpacity(
+        target.position,
         host.config.detents,
         host.detents
       );
-    } else {
-      const targetDetent = host.detents[host.targetIndex];
-      const targetOpacity = targetDetent
-        ? scrimOpacity(targetDetent.position, host.config.detents, host.detents)
-        : 0;
-      opacity = Math.max(
-        scrimOpacity(position, host.config.detents, host.detents),
-        Math.min(host.scrimOpacityFloor, targetOpacity)
-      );
+      opacity = clamp(opacity, Math.min(start, end), Math.max(start, end));
     }
   }
   const isVisible = opacity > 0.001;
@@ -91,7 +86,7 @@ const applyScrimDismiss = (host: ScrimHost, position: number) => {
   }
 };
 
-export const scrimOpacity = (
+const scrimOpacity = (
   position: number,
   rawDetents: ReadonlyArray<RawDetent>,
   detents: ResolvedDetent[]

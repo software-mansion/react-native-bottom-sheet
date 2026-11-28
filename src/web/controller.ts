@@ -9,17 +9,15 @@ import {
   areNumbersEqual,
   areRawDetentsEqual,
   areResolvedDetentsEqual,
-  areScrimOpacitiesEqual,
   areShadowsEqual,
   contentRegionHeight,
-  firstOpenPosition,
   isInvalidContentDetentTarget,
   resolveDetentSpecs,
   surfaceOverflow,
 } from './detents';
 import { clamp, readSafeAreaTop } from './dom';
 import { SheetGestures } from './gestures';
-import { applyScrim, detentIndex, scrimOpacity } from './scrim';
+import { applyScrim, detentIndex } from './scrim';
 import { ScrollMomentum } from './scrollCoordination';
 import { SheetSnapping } from './snapping';
 import type {
@@ -67,8 +65,7 @@ export class BottomSheetWebController {
   translateY = 0;
   lastReportedError: string | null = null;
 
-  scrimPinnedFull = false;
-  scrimOpacityFloor = 0;
+  reanchorScrimOpacity: number | null = null;
   isPanning = false;
 
   private frameRequest: number | null = null;
@@ -171,12 +168,6 @@ export class BottomSheetWebController {
       raiseCloseRequestRegistration(this);
     }
     if (
-      previous !== null &&
-      !areScrimOpacitiesEqual(previous.detents, config.detents)
-    ) {
-      this.updateScrim();
-    }
-    if (
       previous === null ||
       !areNumbersEqual(previous.cornerRadii, config.cornerRadii) ||
       !areShadowsEqual(previous.shadows, config.shadows)
@@ -202,7 +193,7 @@ export class BottomSheetWebController {
     if (indexChanged && !wasLaidOut) {
       this.setDetentIndex(config.index);
     }
-    this.layout(previous?.detents);
+    this.layout();
     if (indexChanged && wasLaidOut) {
       this.setDetentIndex(config.index);
     }
@@ -306,7 +297,7 @@ export class BottomSheetWebController {
     return this.config!;
   }
 
-  private layout(previousRawDetents?: ReadonlyArray<RawDetent>) {
+  private layout() {
     this.needsLayout = false;
     const elements = this.elements;
     if (elements === null || this.config === null) return;
@@ -331,7 +322,7 @@ export class BottomSheetWebController {
         : this.widestCardInsets.insetLeft;
     this.card.updateCardClip();
 
-    this.resolveDetentsFromLayout(previousRawDetents);
+    this.resolveDetentsFromLayout();
     this.replayPendingIndexIfResolved();
     this.updateSurfaceOverflow();
     this.lastAppliedHostHeight = hostHeight;
@@ -374,9 +365,7 @@ export class BottomSheetWebController {
     this.updateScrim();
   }
 
-  private resolveDetentsFromLayout(
-    previousRawDetents: ReadonlyArray<RawDetent> = this.requireConfig().detents
-  ) {
+  private resolveDetentsFromLayout() {
     if (
       this.hasLaidOut &&
       isInvalidContentDetentTarget(this, this.targetIndex)
@@ -401,25 +390,9 @@ export class BottomSheetWebController {
     const previousHostHeight = Number.isFinite(this.lastAppliedHostHeight)
       ? this.lastAppliedHostHeight
       : hostHeight;
-    const previousVisibleHeight =
-      previousHostHeight - this.snapping.currentTranslateY();
-    const firstOpen = firstOpenPosition(this.detents);
-    const wasScrimFull =
-      this.hasLaidOut &&
-      !this.isPanning &&
-      this.requireConfig().modal &&
-      firstOpen > 0 &&
-      previousVisibleHeight + 0.5 >= firstOpen;
-    this.scrimPinnedFull = this.scrimPinnedFull || wasScrimFull;
-    if (
-      this.hasLaidOut &&
-      !this.isPanning &&
-      this.requireConfig().modal &&
-      !this.scrimPinnedFull
-    ) {
-      this.scrimOpacityFloor = Math.max(
-        this.scrimOpacityFloor,
-        scrimOpacity(previousVisibleHeight, previousRawDetents, this.detents)
+    if (this.hasLaidOut && !this.isPanning && this.requireConfig().modal) {
+      this.reanchorScrimOpacity = Number(
+        this.elements?.scrim.style.opacity ?? 0
       );
     }
     this.detents = resolved;
@@ -450,8 +423,7 @@ export class BottomSheetWebController {
       Math.abs(targetHeight - currentVisibleHeight) <= 0.5 ||
       !this.shouldAnimateContentHeight(this.targetIndex)
     ) {
-      this.scrimPinnedFull = false;
-      this.scrimOpacityFloor = 0;
+      this.reanchorScrimOpacity = null;
       this.setTranslateY(targetTy);
       this.emitPosition();
     } else {
