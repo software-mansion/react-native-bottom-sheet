@@ -16,6 +16,12 @@ export const readSafeAreaTop = (() => {
   };
 })();
 
+// How far a drag `over` the sheet's largest detent moves it: UIScrollView's
+// rubber band, following at 0.55 and approaching `dimension`, the room above
+// that detent, so the sheet never lifts off the bottom edge.
+export const rubberBand = (over: number, dimension: number) =>
+  dimension > 0 ? (1 - 1 / ((over * 0.55) / dimension + 1)) * dimension : 0;
+
 // Presses on a scrollbar drag it rather than the sheet.
 export const isScrollbarHit = (event: PointerEvent) => {
   const target = event.target;

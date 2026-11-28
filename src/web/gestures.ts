@@ -1,6 +1,6 @@
 /// <reference lib="dom" />
 
-import { clamp, isScrollbarHit, isTextEditingTarget } from './dom';
+import { clamp, isScrollbarHit, isTextEditingTarget, rubberBand } from './dom';
 import {
   isAtStart,
   COORDINATION_HANDOFF,
@@ -44,6 +44,8 @@ type Gesture = {
   startingIndex: number;
   dragDetents: ResolvedDetent[];
   dragRange: { minTy: number; maxTy: number };
+  // How far the drag has gone past the largest detent, before tension.
+  overdrag: number;
   didMoveSheet: boolean;
   scrollOwnsLowerBoundary: boolean;
 };
@@ -245,6 +247,7 @@ export class SheetGestures {
       startingIndex: host.targetIndex,
       dragDetents: host.detents,
       dragRange: { minTy: 0, maxTy: 0 },
+      overdrag: 0,
       didMoveSheet: false,
       scrollOwnsLowerBoundary: false,
     };
@@ -397,7 +400,20 @@ export class SheetGestures {
       return gesture.manualScroll;
     }
 
-    const newTy = clamp(host.translateY + delta, range.minTy, range.maxTy);
+    // Past the largest detent the sheet follows with tension and settles back
+    // on release, unless the content takes over there.
+    const rawTy =
+      (gesture.overdrag > 0
+        ? range.minTy - gesture.overdrag
+        : host.translateY) + delta;
+    gesture.overdrag =
+      handoff && gesture.chain.length > 0
+        ? 0
+        : Math.max(0, range.minTy - rawTy);
+    const newTy =
+      gesture.overdrag > 0
+        ? range.minTy - rubberBand(gesture.overdrag, range.minTy)
+        : clamp(rawTy, range.minTy, range.maxTy);
     if (Math.abs(newTy - host.translateY) > Number.EPSILON) {
       gesture.didMoveSheet = true;
       host.setTranslateY(newTy);
